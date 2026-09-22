@@ -1,0 +1,17 @@
+{
+  "name": "Ayuri Audio Player",
+  "short_name": "Ayuri",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0e0d13",
+  "theme_color": "#b39ddb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/feathericons/feather/master/icons/music.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

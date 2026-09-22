@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uyari — Reproductor de Música</title>
+  
+  <!-- Enlace a tu CSS modular -->
+  <link rel="stylesheet" href="css/main.css" />
+  
+  <!-- PWA Manifest (Opcional) -->
+  <link rel="manifest" href="manifest.json" />
+</head>
+<body data-theme="verde">
+  <div class="app-container">
+    
+    <!-- Barra lateral (Sidebar) -->
+    <aside class="sidebar">
+      <!-- Marca / Logo Renombrado -->
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <path d="M12 3a9 9 0 1 0 9 9" />
+          <path d="M12 7a5 5 0 1 0 5 5" />
+          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+        </svg>
+        <span class="brand-text">Uyari</span>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" id="btnNavHome">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>Biblioteca</span>
+        </button>
+        <button class="nav-item" id="btnNavSettings">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          <span>Configuración</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-folder-picker">
+        <label for="folderInput" class="btn-load-folder">
+          Cargar Carpeta /descargas
+        </label>
+        <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" />
+      </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="main-content">
+      
+      <!-- Vista 1: Lista de Canciones y Letras -->
+      <section id="viewHome" class="view-panel active">
+        <header class="content-header">
+          <h1>Tu Biblioteca Local</h1>
+          <p class="subtext">Archivos MP3 y letras sincronizadas (.lrc) en tu carpeta de descargas.</p>
+        </header>
+
+        <!-- Barra de Búsqueda Rápida (Ubicada correctamente aquí) -->
+        <div class="search-bar-wrapper">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1.053 1.053 0 1 0 1.49-1.49l-4.354-4.353a9.208 9.208 0 0 0 2.011-5.731c0-5.14-4.226-9.279-9.407-9.279zm-7.3 9.279c0-3.978 3.282-7.172 7.3-7.172s7.3 3.194 7.3 7.172c0 3.978-3.282 7.172-7.3 7.172s-7.3-3.194-7.3-7.172z"/>
+          </svg>
+          <input type="search" id="searchInput" placeholder="¿Qué quieres escuchar? (Título o artista)" autocomplete="off" />
+        </div>
+
+        <div class="library-layout">
+          <div class="track-list" id="trackListContainer">
+            <div class="empty-state">
+              <p>No se han cargado canciones aún.</p>
+              <p class="subtext">Haz clic en <strong>"Cargar Carpeta /descargas"</strong> para sincronizar tu música.</p>
+            </div>
+          </div>
+
+          <div class="lyrics-panel" id="lyricsPanel">
+            <h3>Letra Sincronizada</h3>
+            <div class="lyrics-scroll" id="lyricsScroll">
+              <p class="no-lyrics">Reproduce una pista para ver su letra sincronizada.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Vista 2: Apartado de Configuración -->
+      <section id="viewSettings" class="view-panel">
+        <header class="content-header">
+          <h1>Configuración</h1>
+          <p class="subtext">Ajusta la apariencia visual del reproductor conservando la estética oscura.</p>
+        </header>
+
+        <!-- Tarjeta 1: Acento de Color -->
+        <div class="settings-card">
+          <div class="setting-title-box">
+            <h3>Color Característico (Acento)</h3>
+            <p>Selecciona el color de énfasis para los botones, barras de volumen, controles y estados activos. El fondo dominante se mantendrá en negro carbón.</p>
+          </div>
+
+          <div class="color-palette-selector" id="colorPickerContainer">
+            <button type="button" class="color-swatch swatch-verde" data-color="verde" title="Verde"></button>
+            <button type="button" class="color-swatch swatch-rojo" data-color="rojo" title="Rojo"></button>
+            <button type="button" class="color-swatch swatch-amarillo" data-color="amarillo" title="Amarillo"></button>
+            <button type="button" class="color-swatch swatch-morado" data-color="morado" title="Morado"></button>
+            <button type="button" class="color-swatch swatch-azul" data-color="azul" title="Azul"></button>
+            <button type="button" class="color-swatch swatch-gris" data-color="gris" title="Gris"></button>
+          </div>
+        </div>
+
+        <!-- Tarjeta 2: Almacenamiento Local Independiente -->
+        <div class="settings-card" style="margin-top: 20px;">
+          <div class="setting-title-box">
+            <h3>Almacenamiento Local</h3>
+            <p>Las canciones y letras están guardadas en la memoria de tu navegador (IndexedDB) para que no tengas que recargarlas.</p>
+          </div>
+          <button type="button" class="btn-load-folder" onclick="window.clearLibrary()" style="display: inline-block; border-color: #e50914; color: #ff6b6b;">
+            Vaciar Biblioteca Guardada
+          </button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Barra de Reproducción Inferior -->
+  <footer class="player-bar" id="playerBar">
+    <!-- Botón para minimizar (solo visible al expandir) -->
+    <button class="btn-minimize" id="btnMinimize" title="Minimizar">
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 15.5l-6-6h12z"/></svg>
+    </button>
+
+    <!-- Área izquierda expandible -->
+    <div class="now-playing-left" id="expandPlayerArea" style="cursor: pointer;" title="Expandir reproductor">
+      <div class="cover-art-box">
+        <img id="currentCoverArt" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='56' fill='%23282828'><rect width='56' height='56'/></svg>" alt="Cover" />
+      </div>
+      <div class="track-info">
+        <div class="track-name" id="playerTitle">Selecciona una pista</div>
+        <div class="track-artist" id="playerArtist">-</div>
+      </div>
+    </div>
+
+    <!-- Controles centrales -->
+    <div class="player-center">
+      <div class="playback-controls">
+        <!-- Shuffle / Aleatorio -->
+        <button class="control-btn" id="btnShuffle" title="Activar aleatorio">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+          </svg>
+        </button>
+
+        <button class="control-btn" id="btnPrev" title="Anterior">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+
+        <button class="control-btn btn-play-main" id="btnPlayPause" title="Reproducir">
+          <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pauseIcon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+
+        <button class="control-btn" id="btnNext" title="Siguiente">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+
+        <!-- Repeat / Bucle -->
+        <button class="control-btn" id="btnRepeat" title="Repetir">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+          </svg>
+          <span class="repeat-badge-one" id="repeatBadgeOne">1</span>
+        </button>
+      </div>
+
+      <div class="playback-timeline">
+        <span class="time-label" id="currentTime">0:00</span>
+        <div class="timeline-bar" id="timelineBar">
+          <div class="timeline-fill" id="timelineFill"></div>
+        </div>
+        <span class="time-label" id="totalDuration">0:00</span>
+      </div>
+    </div>
+
+    <!-- Contenedor de letras expandidas en pantalla completa -->
+    <div class="expanded-lyrics-container" id="expandedLyricsContainer">
+      <div class="expanded-lyrics-scroll" id="expandedLyricsScroll">
+        <p class="no-lyrics">Reproduce una pista para ver su letra.</p>
+      </div>
+    </div>
+
+    <!-- Control de volumen -->
+    <div class="player-right">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+      <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
+    </div>
+  </footer>
+
+  <!-- Elemento de Audio Oculto -->
+  <audio id="audioElement" preload="metadata"></audio>
+
+  <!-- Scripts modulares -->
+  <script src="js/jsmediatags.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
