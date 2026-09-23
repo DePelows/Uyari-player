@@ -1,103 +1,177 @@
-document.addEventListener("DOMContentLoaded", () => {
-  // =========================================================
-  // 1. GESTIÓN DE TEMA Y COLORES DE ACENTO
-  // =========================================================
-  const THEME_STORAGE_KEY = "spotify_theme_accent";
-  const DEFAULT_THEME = "verde";
-  const colorSwatches = document.querySelectorAll(".color-swatch");
+window.App = {
+  playlist: [],
+  currentIndex: -1,
+  parsedLyrics: []
+};
 
-  function aplicarColorAcento(color) {
-    document.body.setAttribute("data-theme", color);
-    localStorage.setItem(THEME_STORAGE_KEY, color);
+document.addEventListener("DOMContentLoaded", async () => {
+  // 1. Inicializar base de datos IndexedDB
+  await window.initDB();
 
-    colorSwatches.forEach((swatch) => {
-      if (swatch.dataset.color === color) {
-        swatch.classList.add("selected");
-      } else {
-        swatch.classList.remove("selected");
-      }
-    });
+  // 2. Cargar pistas previamente guardadas
+  const storedTracks = await window.loadTracksFromDB();
+  if (storedTracks && storedTracks.length > 0) {
+    window.App.playlist = storedTracks;
+    window.renderTrackList();
   }
 
-  const temaGuardado = localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME;
-  aplicarColorAcento(temaGuardado);
-
-  colorSwatches.forEach((swatch) => {
-    swatch.addEventListener("click", () => {
-      aplicarColorAcento(swatch.dataset.color);
-    });
-  });
-
-  // =========================================================
-  // 2. NAVEGACIÓN BLINDADA (BIBLIOTECA VS CONFIGURACIÓN)
-  // =========================================================
+  // 3. Conmutador de Vistas (Biblioteca / Configuración)
   const btnNavHome = document.getElementById("btnNavHome");
   const btnNavSettings = document.getElementById("btnNavSettings");
   const viewHome = document.getElementById("viewHome");
   const viewSettings = document.getElementById("viewSettings");
 
-  function switchView(target) {
-    if (!viewHome || !viewSettings) return;
+  btnNavHome.addEventListener("click", () => {
+    btnNavHome.classList.add("active");
+    btnNavSettings.classList.remove("active");
+    viewHome.classList.add("active");
+    viewSettings.classList.remove("active");
+  });
 
-    if (target === "settings") {
-      // Activar botón de configuración
-      btnNavSettings.classList.add("active");
-      btnNavHome.classList.remove("active");
+  btnNavSettings.addEventListener("click", () => {
+    btnNavSettings.classList.add("active");
+    btnNavHome.classList.remove("active");
+    viewSettings.classList.add("active");
+    viewHome.classList.remove("active");
+  });
 
-      // Mostrar vista de configuración y ocultar home
-      viewHome.classList.remove("active");
-      viewHome.style.display = "none";
+  // 4. Selector de Acento de Color
+  const colorSwatches = document.querySelectorAll(".color-swatch");
+  const savedColor = localStorage.getItem("vortice-theme") || "verde";
+  document.body.setAttribute("data-theme", savedColor);
 
-      viewSettings.classList.add("active");
-      viewSettings.style.display = "block";
-    } else {
-      // Activar botón de biblioteca
-      btnNavHome.classList.add("active");
-      btnNavSettings.classList.remove("active");
+  colorSwatches.forEach((swatch) => {
+    swatch.addEventListener("click", () => {
+      const color = swatch.dataset.color;
+      document.body.setAttribute("data-theme", color);
+      localStorage.setItem("vortice-theme", color);
+    });
+  });
 
-      // Mostrar vista de home y ocultar configuración
-      viewSettings.classList.remove("active");
-      viewSettings.style.display = "none";
+  // 5. Carga de Carpeta Local (.mp3 y .lrc)
+  const folderInput = document.getElementById("folderInput");
+  folderInput.addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
 
-      viewHome.classList.add("active");
-      viewHome.style.display = "block";
+    const mp3Files = files.filter(f => f.name.toLowerCase().endsWith(".mp3"));
+    const lrcFiles = files.filter(f => f.name.toLowerCase().endsWith(".lrc"));
+
+    const lrcMap = {};
+    for (const lf of lrcFiles) {
+      const baseName = lf.name.substring(0, lf.name.lastIndexOf(".")).toLowerCase().trim();
+      lrcMap[baseName] = await lf.text();
     }
-  }
 
-  if (btnNavHome) {
-    btnNavHome.addEventListener("click", (e) => {
-      e.preventDefault();
-      switchView("home");
-    });
-  }
+    const newTracks = [];
 
-  if (btnNavSettings) {
-    btnNavSettings.addEventListener("click", (e) => {
-      e.preventDefault();
-      switchView("settings");
-    });
-  }
+    for (const file of mp3Files) {
+      const baseName = file.name.substring(0, file.name.lastIndexOf(".")).toLowerCase().trim();
+      const matchedLrc = lrcMap[baseName] || null;
 
-  // =========================================================
-  // 3. REPRODUCTOR EXPANDIDO (AL HACER CLIC EN LA CARÁTULA)
-  // =========================================================
+      // Lectura de etiquetas ID3 mediante jsmediatags
+      const metadata = await new Promise((resolve) => {
+        if (window.jsmediatags) {
+          window.jsmediatags.read(file, {
+            onSuccess: (tag) => {
+              const tags = tag.tags;
+              let coverUrl = null;
+
+              if (tags.picture) {
+                const { data, format } = tags.picture;
+                let base64String = "";
+                for (let i = 0; i < data.length; i++) {
+                  base64String += String.fromCharCode(data[i]);
+                }
+                coverUrl = `data:${format};base64,${window.btoa(base64String)}`;
+              }
+
+              resolve({
+                title: tags.title || file.name.replace(/\.[^/.]+$/, ""),
+                artist: tags.artist || "Artista Desconocido",
+                coverUrl: coverUrl
+              });
+            },
+            onError: () => {
+              resolve({
+                title: file.name.replace(/\.[^/.]+$/, ""),
+                artist: "Artista Desconocido",
+                coverUrl: null
+              });
+            }
+          });
+        } else {
+          resolve({
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            artist: "Artista Desconocido",
+            coverUrl: null
+          });
+        }
+      });
+
+      const trackItem = {
+        name: metadata.title,
+        artist: metadata.artist,
+        coverUrl: metadata.coverUrl,
+        lrcContent: matchedLrc,
+        fileBlob: file,
+        url: URL.createObjectURL(file)
+      };
+
+      newTracks.push(trackItem);
+      await window.saveTrackToDB(trackItem);
+    }
+
+    window.App.playlist = newTracks;
+    window.renderTrackList();
+    if (window.App.playlist.length > 0) {
+      window.loadTrack(0, false);
+    }
+  });
+
+  // 6. Expandir / Minimizar reproductor en móviles
+  const expandArea = document.getElementById("expandPlayerArea");
   const playerBar = document.getElementById("playerBar");
-  const expandPlayerArea = document.getElementById("expandPlayerArea");
   const btnMinimize = document.getElementById("btnMinimize");
 
-  if (expandPlayerArea && playerBar && btnMinimize) {
-    expandPlayerArea.addEventListener("click", () => {
-      if (!playerBar.classList.contains("expanded")) {
-        playerBar.classList.add("expanded");
-        setTimeout(() => {
-          if (window.scrollToActiveLyric) window.scrollToActiveLyric();
-        }, 300);
-      }
-    });
+  expandArea.addEventListener("click", () => {
+    if (window.innerWidth <= 768) {
+      playerBar.classList.add("expanded");
+    }
+  });
 
-    btnMinimize.addEventListener("click", (e) => {
-      e.stopPropagation();
-      playerBar.classList.remove("expanded");
-    });
+  btnMinimize.addEventListener("click", (e) => {
+    e.stopPropagation();
+    playerBar.classList.remove("expanded");
+  });
+
+  // 7. Registro de Service Worker para soporte PWA Offline
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then(() => console.log("Service Worker registrado con éxito."))
+      .catch((err) => console.warn("Error al registrar SW:", err));
   }
 });
+
+// Parser de letras sincronizadas (.lrc)
+window.parseLRC = function(lrcText) {
+  if (!lrcText) return [];
+  const lines = lrcText.split("\n");
+  const result = [];
+  const timeExp = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+
+  lines.forEach((line) => {
+    const match = timeExp.exec(line);
+    if (match) {
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseInt(match[2], 10);
+      const millis = parseInt(match[3], 10);
+      const timeInSec = minutes * 60 + seconds + (millis / (match[3].length === 3 ? 1000 : 100));
+      const text = line.replace(timeExp, "").trim();
+      result.push({ time: timeInSec, text: text });
+    }
+  });
+
+  return result.sort((a, b) => a.time - b.time);
+};
