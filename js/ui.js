@@ -40,8 +40,7 @@ window.renderTrackList = function(filteredTracks = null) {
     `;
 
     card.addEventListener("click", () => {
-      window.loadTrack(originalIndex);
-      document.getElementById("audioElement").play();
+      window.loadTrack(originalIndex, true);
     });
 
     container.appendChild(card);
