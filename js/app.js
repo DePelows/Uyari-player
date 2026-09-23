@@ -48,9 +48,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // 5. Carga de Carpeta Local (.mp3 y .lrc)
-  const folderInput = document.getElementById("folderInput");
-  folderInput.addEventListener("change", async (e) => {
+  // 5. Carga Unificada de Carpetas (Desktop, Móvil vacío y Botón de cabecera)
+  const folderInputs = [
+    document.getElementById("folderInput"),
+    document.getElementById("folderInputMobile"),
+    document.getElementById("folderInputHeader")
+  ];
+
+  const handleFolderSelection = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
 
@@ -69,7 +74,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const baseName = file.name.substring(0, file.name.lastIndexOf(".")).toLowerCase().trim();
       const matchedLrc = lrcMap[baseName] || null;
 
-      // Lectura de etiquetas ID3 mediante jsmediatags
       const metadata = await new Promise((resolve) => {
         if (window.jsmediatags) {
           window.jsmediatags.read(file, {
@@ -127,6 +131,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (window.App.playlist.length > 0) {
       window.loadTrack(0, false);
     }
+  };
+
+  folderInputs.forEach((input) => {
+    if (input) {
+      input.addEventListener("change", handleFolderSelection);
+    }
   });
 
   // 6. Expandir / Minimizar reproductor en móviles
@@ -145,7 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     playerBar.classList.remove("expanded");
   });
 
-  // 7. Registro de Service Worker para soporte PWA Offline
+  // 7. Registro de Service Worker para PWA Offline
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker
       .register("./sw.js")
