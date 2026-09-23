@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Uyari Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Vórtice — Reproductor</title>
   
   <link rel="stylesheet" href="css/main.css" />
   <link rel="manifest" href="manifest.json" />
@@ -21,7 +21,7 @@
           <path d="M12 7a5 5 0 1 0 5 5" />
           <circle cx="12" cy="12" r="1.5" fill="#FFFFFF" stroke="none" />
         </svg>
-        <span class="brand-text">Uyari</span>
+        <span class="brand-text">Vórtice</span>
       </div>
 
       <nav class="nav-menu">
@@ -49,23 +49,38 @@
       <!-- Vista 1: Lista de Canciones y Letras -->
       <section id="viewHome" class="view-panel active">
         <header class="content-header">
-          <h1>Tu Biblioteca Local</h1>
-          <p class="subtext">Archivos MP3 y letras sincronizadas (.lrc) en tu almacenamiento.</p>
+          <div class="header-title-row">
+            <div>
+              <h1>Tu Biblioteca Local</h1>
+              <p class="subtext">Archivos MP3 y letras sincronizadas (.lrc) en tu almacenamiento.</p>
+            </div>
+            <!-- Botón + para agregar música en cualquier momento desde móvil -->
+            <label for="folderInputHeader" class="btn-add-music-mobile" title="Añadir canciones">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+              </svg>
+            </label>
+            <input type="file" id="folderInputHeader" webkitdirectory directory multiple style="display: none;" />
+          </div>
         </header>
 
-        <!-- Barra de Búsqueda Rápida -->
+        <!-- Barra de Búsqueda Rápida (con placeholder corto) -->
         <div class="search-bar-wrapper">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <path d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1.053 1.053 0 1 0 1.49-1.49l-4.354-4.353a9.208 9.208 0 0 0 2.011-5.731c0-5.14-4.226-9.279-9.407-9.279zm-7.3 9.279c0-3.978 3.282-7.172 7.3-7.172s7.3 3.194 7.3 7.172c0 3.978-3.282 7.172-7.3 7.172s-7.3-3.194-7.3-7.172z"/>
           </svg>
-          <input type="search" id="searchInput" placeholder="¿Qué quieres escuchar? (Título o artista)" autocomplete="off" />
+          <input type="search" id="searchInput" placeholder="Buscar canción o artista..." autocomplete="off" />
         </div>
 
         <div class="library-layout">
           <div class="track-list" id="trackListContainer">
             <div class="empty-state">
               <p>No se han cargado canciones aún.</p>
-              <p class="subtext">Haz clic en <strong>"Cargar Carpeta /descargas"</strong> para sincronizar tu música.</p>
+              <p class="subtext">Selecciona la carpeta donde guardas tus archivos MP3 y .lrc</p>
+              <label for="folderInputMobile" class="btn-empty-load">
+                Cargar Carpeta de Música
+              </label>
+              <input type="file" id="folderInputMobile" webkitdirectory directory multiple style="display: none;" />
             </div>
           </div>
 
@@ -115,7 +130,7 @@
     </main>
   </div>
 
-  <!-- Barra de Reproducción Inferior -->
+  <!-- Barra de Reproducción Inferior (Mini-Player flotante en móvil) -->
   <footer class="player-bar" id="playerBar">
     <button class="btn-minimize" id="btnMinimize" title="Minimizar">
       <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 15.5l-6-6h12z"/></svg>
