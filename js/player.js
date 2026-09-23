@@ -113,13 +113,13 @@ function getRandomIndex() {
   return newIdx;
 }
 
-// MediaSession API para pantalla de bloqueo y barra de estado
+// MediaSession API para pantalla de bloqueo y barra de notificaciones del celular
 function updateMediaSession(track) {
   if ("mediaSession" in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.name || "Desconocido",
       artist: track.artist || "Desconocido",
-      album: "Vórtice",
+      album: "Uyari",
       artwork: track.coverUrl
         ? [{ src: track.coverUrl, sizes: "512x512", type: "image/png" }]
         : [{ src: "icon.svg", sizes: "512x512", type: "image/svg+xml" }]
