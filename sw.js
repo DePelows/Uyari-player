@@ -1,44 +1,55 @@
-const CACHE_NAME = 'mini-spotify-v6';
+const CACHE_NAME = "vortice-cache-v8";
+
 const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './css/main.css',
-  './js/app.js',
-  './js/player.js',
-  './js/ui.js',
-  './js/db.js',
-  './js/jsmediatags.min.js'
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon.svg",
+  "./css/main.css",
+  "./js/app.js",
+  "./js/db.js",
+  "./js/jsmediatags.min.js",
+  "./js/player.js",
+  "./js/ui.js"
 ];
 
-self.addEventListener('install', (event) => {
+// Instalación: Cachea todos los archivos esenciales
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+// Activación: Purga versiones anteriores de caché
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      )
-    )
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.url.startsWith('blob:')) return;
+// Interceptor de peticiones: Responde offline desde caché
+self.addEventListener("fetch", (event) => {
+  if (!event.request.url.startsWith("http")) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
+      if (cachedResponse) {
+        return cachedResponse;
+      }
       return fetch(event.request).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
+        return caches.match("./index.html");
       });
     })
   );
