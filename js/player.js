@@ -126,7 +126,6 @@ function playNextTrack(isAutoEnded = false) {
   const total = window.App.playlist.length;
   if (total === 0) return;
 
-  // Si terminó sola y está activo repetir una pista
   if (isAutoEnded && repeatMode === "one") {
     audioElement.currentTime = 0;
     audioElement.play();
@@ -134,17 +133,14 @@ function playNextTrack(isAutoEnded = false) {
   }
 
   if (isShuffle) {
-    window.loadTrack(getRandomIndex());
-    audioElement.play();
+    window.loadTrack(getRandomIndex(), true);
     return;
   }
 
   if (window.App.currentIndex < total - 1) {
-    window.loadTrack(window.App.currentIndex + 1);
-    audioElement.play();
+    window.loadTrack(window.App.currentIndex + 1, true);
   } else if (repeatMode === "all") {
-    window.loadTrack(0);
-    audioElement.play();
+    window.loadTrack(0, true);
   }
 }
 
@@ -152,24 +148,20 @@ function playPrevTrack() {
   const total = window.App.playlist.length;
   if (total === 0) return;
 
-  // Si ya pasaron más de 3 segundos, reiniciar la pista actual
   if (audioElement.currentTime > 3) {
     audioElement.currentTime = 0;
     return;
   }
 
   if (isShuffle) {
-    window.loadTrack(getRandomIndex());
-    audioElement.play();
+    window.loadTrack(getRandomIndex(), true);
     return;
   }
 
   if (window.App.currentIndex > 0) {
-    window.loadTrack(window.App.currentIndex - 1);
-    audioElement.play();
+    window.loadTrack(window.App.currentIndex - 1, true);
   } else if (repeatMode === "all") {
-    window.loadTrack(total - 1);
-    audioElement.play();
+    window.loadTrack(total - 1, true);
   }
 }
 
