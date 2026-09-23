@@ -3,25 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Uyari — Reproductor de Música</title>
+  <title>Uyari Player</title>
   
-  <!-- Enlace a tu CSS modular -->
   <link rel="stylesheet" href="css/main.css" />
-  
-  <!-- PWA Manifest (Opcional) -->
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
 </head>
 <body data-theme="verde">
   <div class="app-container">
     
-    <!-- Barra lateral (Sidebar) -->
+    <!-- Barra lateral (Sidebar en Desktop / Barra inferior en Móvil) -->
     <aside class="sidebar">
-      <!-- Marca / Logo Renombrado -->
       <div class="brand">
-        <svg class="brand-icon" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <svg class="brand-icon" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" style="background-color: #000000; border-radius: 8px; padding: 4px;">
           <path d="M12 3a9 9 0 1 0 9 9" />
           <path d="M12 7a5 5 0 1 0 5 5" />
-          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.5" fill="#FFFFFF" stroke="none" />
         </svg>
         <span class="brand-text">Uyari</span>
       </div>
@@ -52,10 +50,10 @@
       <section id="viewHome" class="view-panel active">
         <header class="content-header">
           <h1>Tu Biblioteca Local</h1>
-          <p class="subtext">Archivos MP3 y letras sincronizadas (.lrc) en tu carpeta de descargas.</p>
+          <p class="subtext">Archivos MP3 y letras sincronizadas (.lrc) en tu almacenamiento.</p>
         </header>
 
-        <!-- Barra de Búsqueda Rápida (Ubicada correctamente aquí) -->
+        <!-- Barra de Búsqueda Rápida -->
         <div class="search-bar-wrapper">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <path d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1.053 1.053 0 1 0 1.49-1.49l-4.354-4.353a9.208 9.208 0 0 0 2.011-5.731c0-5.14-4.226-9.279-9.407-9.279zm-7.3 9.279c0-3.978 3.282-7.172 7.3-7.172s7.3 3.194 7.3 7.172c0 3.978-3.282 7.172-7.3 7.172s-7.3-3.194-7.3-7.172z"/>
@@ -80,18 +78,17 @@
         </div>
       </section>
 
-      <!-- Vista 2: Apartado de Configuración -->
+      <!-- Vista 2: Configuración -->
       <section id="viewSettings" class="view-panel">
         <header class="content-header">
           <h1>Configuración</h1>
           <p class="subtext">Ajusta la apariencia visual del reproductor conservando la estética oscura.</p>
         </header>
 
-        <!-- Tarjeta 1: Acento de Color -->
         <div class="settings-card">
           <div class="setting-title-box">
             <h3>Color Característico (Acento)</h3>
-            <p>Selecciona el color de énfasis para los botones, barras de volumen, controles y estados activos. El fondo dominante se mantendrá en negro carbón.</p>
+            <p>Selecciona el color de énfasis para los botones, barras de volumen, controles y estados activos.</p>
           </div>
 
           <div class="color-palette-selector" id="colorPickerContainer">
@@ -104,7 +101,6 @@
           </div>
         </div>
 
-        <!-- Tarjeta 2: Almacenamiento Local Independiente -->
         <div class="settings-card" style="margin-top: 20px;">
           <div class="setting-title-box">
             <h3>Almacenamiento Local</h3>
@@ -121,12 +117,10 @@
 
   <!-- Barra de Reproducción Inferior -->
   <footer class="player-bar" id="playerBar">
-    <!-- Botón para minimizar (solo visible al expandir) -->
     <button class="btn-minimize" id="btnMinimize" title="Minimizar">
       <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 15.5l-6-6h12z"/></svg>
     </button>
 
-    <!-- Área izquierda expandible -->
     <div class="now-playing-left" id="expandPlayerArea" style="cursor: pointer;" title="Expandir reproductor">
       <div class="cover-art-box">
         <img id="currentCoverArt" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='56' fill='%23282828'><rect width='56' height='56'/></svg>" alt="Cover" />
@@ -137,10 +131,8 @@
       </div>
     </div>
 
-    <!-- Controles centrales -->
     <div class="player-center">
       <div class="playback-controls">
-        <!-- Shuffle / Aleatorio -->
         <button class="control-btn" id="btnShuffle" title="Activar aleatorio">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
@@ -160,7 +152,6 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
 
-        <!-- Repeat / Bucle -->
         <button class="control-btn" id="btnRepeat" title="Repetir">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
@@ -178,24 +169,20 @@
       </div>
     </div>
 
-    <!-- Contenedor de letras expandidas en pantalla completa -->
     <div class="expanded-lyrics-container" id="expandedLyricsContainer">
       <div class="expanded-lyrics-scroll" id="expandedLyricsScroll">
         <p class="no-lyrics">Reproduce una pista para ver su letra.</p>
       </div>
     </div>
 
-    <!-- Control de volumen -->
     <div class="player-right">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
       <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
     </div>
   </footer>
 
-  <!-- Elemento de Audio Oculto -->
   <audio id="audioElement" preload="metadata"></audio>
 
-  <!-- Scripts modulares -->
   <script src="js/jsmediatags.min.js"></script>
   <script src="js/db.js"></script>
   <script src="js/player.js"></script>
