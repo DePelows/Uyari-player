@@ -1,11 +1,10 @@
 {
-  "name": "Ayuri Audio Player",
-  "short_name": "Ayuri",
+  "name": "Uyari Player",
+  "short_name": "Uyari",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0e0d13",
-  "theme_color": "#b39ddb",
-  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "icon.svg",
