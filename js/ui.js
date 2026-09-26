@@ -1,6 +1,6 @@
 window.currentLyricIndex = -1;
+window.currentVideoPath = ""; // Ruta actual en la vista de video
 
-// RENDERIZAR CANCIONES (Audio)
 window.renderTrackList = function(filteredTracks = null) {
   const container = document.getElementById("trackListContainer");
   if (!container) return;
@@ -30,7 +30,7 @@ window.renderTrackList = function(filteredTracks = null) {
     `;
 
     card.addEventListener("click", () => {
-      // Si el usuario toca una canción y hay un video reproduciéndose, lo pausamos
+      if (window.pauseAudioPlayer) window.pauseAudioPlayer(); // Usamos la global para matar videos
       const videoEl = document.getElementById("mainVideoPlayer");
       if (videoEl && !videoEl.paused) videoEl.pause();
       
@@ -41,7 +41,6 @@ window.renderTrackList = function(filteredTracks = null) {
   });
 };
 
-// RENDERIZAR ARTISTAS
 window.renderArtistList = function() {
   const container = document.getElementById("trackListContainer");
   if (!container) return;
@@ -52,7 +51,6 @@ window.renderArtistList = function() {
     return;
   }
 
-  // Agrupar por artista
   const artistsMap = {};
   window.App.playlist.forEach(track => {
     const artistName = track.artist || "Desconocido";
@@ -74,7 +72,6 @@ window.renderArtistList = function() {
     `;
 
     card.addEventListener("click", () => {
-      // Al hacer clic, vuelve a la pestaña Canciones filtrada por ese artista
       document.getElementById("tabSongs").classList.add("active");
       document.getElementById("tabArtists").classList.remove("active");
       window.renderTrackList(artistsMap[artist]);
@@ -84,21 +81,70 @@ window.renderArtistList = function() {
   });
 };
 
-// RENDERIZAR VIDEOS
-window.renderVideoList = function() {
+// MOTOR DE CARPETAS PARA VIDEOS
+window.renderVideoList = function(path = "") {
+  window.currentVideoPath = path;
   const container = document.getElementById("videoGridContainer");
+  const breadcrumbs = document.getElementById("videoBreadcrumbs");
   if (!container) return;
   container.innerHTML = "";
+
+  // 1. DIBUJAR BREADCRUMBS (Migas de pan)
+  if (breadcrumbs) {
+    let bcHTML = `<span class="breadcrumb-item" onclick="window.renderVideoList('')">Inicio</span>`;
+    if (path !== "") {
+      const parts = path.split('/').filter(p => p !== "");
+      let buildPath = "";
+      parts.forEach((part) => {
+        buildPath += part + "/";
+        bcHTML += ` <span class="breadcrumb-separator">/</span> <span class="breadcrumb-item" onclick="window.renderVideoList('${buildPath}')">${part}</span>`;
+      });
+    }
+    breadcrumbs.innerHTML = bcHTML;
+  }
 
   if (window.App.videoList.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>No se han cargado videos.</p></div>`;
     return;
   }
 
+  // 2. AGRUPAR CARPETAS VS ARCHIVOS
+  const folders = new Set();
+  const files = [];
+
   window.App.videoList.forEach((videoItem) => {
+    if (videoItem.path.startsWith(path)) {
+      const remainingPath = videoItem.path.substring(path.length);
+      const slashIndex = remainingPath.indexOf('/');
+      
+      if (slashIndex !== -1) {
+        // Es una sub-carpeta
+        folders.add(remainingPath.substring(0, slashIndex));
+      } else {
+        // Es un archivo en este nivel
+        files.push(videoItem);
+      }
+    }
+  });
+
+  // 3. DIBUJAR CARPETAS
+  Array.from(folders).sort().forEach(folder => {
+    const card = document.createElement("div");
+    card.className = "folder-card";
+    card.innerHTML = `
+      <div class="folder-icon">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+      </div>
+      <div class="folder-name">${folder}</div>
+    `;
+    card.onclick = () => window.renderVideoList(path + folder + "/");
+    container.appendChild(card);
+  });
+
+  // 4. DIBUJAR ARCHIVOS DE VIDEO
+  files.sort((a,b) => a.name.localeCompare(b.name)).forEach(videoItem => {
     const card = document.createElement("div");
     card.className = "video-card";
-    
     card.innerHTML = `
       <div class="video-thumb">
         <svg viewBox="0 0 24 24" width="48" height="48" fill="rgba(255,255,255,0.2)"><path d="M8 5v14l11-7z"/></svg>
@@ -107,9 +153,7 @@ window.renderVideoList = function() {
     `;
 
     card.addEventListener("click", () => {
-      // Pausar música si está sonando
       if (window.pauseAudioPlayer) window.pauseAudioPlayer();
-      
       const videoWrapper = document.getElementById("videoPlayerWrapper");
       const videoPlayer = document.getElementById("mainVideoPlayer");
       const videoTitle = document.getElementById("videoTitleDisplay");
@@ -117,19 +161,19 @@ window.renderVideoList = function() {
       videoWrapper.style.display = "block";
       videoTitle.textContent = videoItem.name;
       
-      // Liberar URL vieja del video
       if (window.currentVideoUrl) URL.revokeObjectURL(window.currentVideoUrl);
-      
       window.currentVideoUrl = URL.createObjectURL(videoItem.fileBlob);
       videoPlayer.src = window.currentVideoUrl;
       videoPlayer.play();
       
-      // Hacer scroll hacia arriba para ver el video en celular
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
-
     container.appendChild(card);
   });
+
+  if (folders.size === 0 && files.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>Carpeta vacía.</p></div>`;
+  }
 };
 
 // BUSCADOR EN VIVO
@@ -138,7 +182,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       const term = e.target.value.toLowerCase().trim();
-      // Forzar tab Canciones activo al buscar
       document.getElementById("tabSongs").classList.add("active");
       document.getElementById("tabArtists").classList.remove("active");
 
@@ -153,7 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// LETRAS Y UI INFERIOR... (Se mantiene igual que antes)
 window.renderLyricsView = function() {
   const lyricsScroll = document.getElementById("lyricsScroll");
   const expandedLyricsScroll = document.getElementById("expandedLyricsScroll");
