@@ -30,7 +30,7 @@ window.renderTrackList = function(filteredTracks = null) {
     `;
 
     card.addEventListener("click", () => {
-      if (window.pauseAudioPlayer) window.pauseAudioPlayer(); // Usamos la global para matar videos
+      if (window.pauseAudioPlayer) window.pauseAudioPlayer(); // Pausar video si está sonando
       const videoEl = document.getElementById("mainVideoPlayer");
       if (videoEl && !videoEl.paused) videoEl.pause();
       
@@ -41,6 +41,7 @@ window.renderTrackList = function(filteredTracks = null) {
   });
 };
 
+// RENDERIZAR ARTISTAS CON DIVISIÓN INTELIGENTE DE COLABORACIONES
 window.renderArtistList = function() {
   const container = document.getElementById("trackListContainer");
   if (!container) return;
@@ -52,10 +53,22 @@ window.renderArtistList = function() {
   }
 
   const artistsMap = {};
+  
   window.App.playlist.forEach(track => {
-    const artistName = track.artist || "Desconocido";
-    if (!artistsMap[artistName]) artistsMap[artistName] = [];
-    artistsMap[artistName].push(track);
+    const rawArtistString = track.artist || "Desconocido";
+    
+    // Separa usando: coma, &, "y", "ft.", "feat." o "x" (ignorando mayúsculas/minúsculas)
+    const individualArtists = rawArtistString.split(/(?:,|\s+&\s+|\s+y\s+|\s+ft\.?\s+|\s+feat\.?\s+|\s+x\s+)/i)
+                                             .map(a => a.trim())
+                                             .filter(a => a.length > 0);
+
+    individualArtists.forEach(artistName => {
+      if (!artistsMap[artistName]) artistsMap[artistName] = [];
+      // Asegurarse de no meter la misma canción dos veces al mismo artista
+      if (!artistsMap[artistName].includes(track)) {
+        artistsMap[artistName].push(track);
+      }
+    });
   });
 
   Object.keys(artistsMap).sort().forEach(artist => {
@@ -196,6 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// LETRAS Y UI (Sin cambios)
 window.renderLyricsView = function() {
   const lyricsScroll = document.getElementById("lyricsScroll");
   const expandedLyricsScroll = document.getElementById("expandedLyricsScroll");
