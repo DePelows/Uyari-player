@@ -54,7 +54,6 @@
               <h1>Tu Biblioteca Local</h1>
               <p class="subtext">Archivos MP3 y letras sincronizadas (.lrc) en tu almacenamiento.</p>
             </div>
-            <!-- Botón + para agregar música en cualquier momento desde móvil -->
             <label for="folderInputHeader" class="btn-add-music-mobile" title="Añadir canciones">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
                 <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -130,7 +129,7 @@
     </main>
   </div>
 
-  <!-- Barra de Reproducción Inferior (Mini-Player flotante en móvil) -->
+  <!-- Barra de Reproducción Inferior -->
   <footer class="player-bar" id="playerBar">
     <button class="btn-minimize" id="btnMinimize" title="Minimizar">
       <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 15.5l-6-6h12z"/></svg>
@@ -196,9 +195,7 @@
     </div>
   </footer>
 
-  <!-- Doble buffer para transición continua en segundo plano -->
-  <audio id="audioA" preload="auto"></audio>
-  <audio id="audioB" preload="auto"></audio>
+  <audio id="audioElement" preload="metadata" playsinline></audio>
 
   <script src="js/jsmediatags.min.js"></script>
   <script src="js/db.js"></script>
