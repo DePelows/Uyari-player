@@ -1,5 +1,5 @@
 const DB_NAME = "VorticeMusicDB";
-const DB_VERSION = 2; // Subimos versión por precaución al añadir 'type'
+const DB_VERSION = 3; // Subimos versión por la propiedad 'path'
 const STORE_NAME = "tracks";
 
 let dbInstance = null;
@@ -31,8 +31,9 @@ window.saveTrackToDB = function(track) {
     const store = transaction.objectStore(STORE_NAME);
 
     const record = {
-      type: track.type || 'audio', // Se guardan audios y videos marcados
+      type: track.type || 'audio',
       name: track.name,
+      path: track.path || track.name, // Guarda la ruta
       artist: track.artist,
       coverUrl: track.coverUrl,
       lrcContent: track.lrcContent,
@@ -55,13 +56,14 @@ window.loadTracksFromDB = function() {
     request.onsuccess = (e) => {
       const records = e.target.result || [];
       const tracks = records.map((r) => ({
-        type: r.type || 'audio', // Por defecto audio si era viejo
+        type: r.type || 'audio',
         name: r.name,
+        path: r.path || r.name,
         artist: r.artist,
         coverUrl: r.coverUrl,
         lrcContent: r.lrcContent,
         fileBlob: r.fileBlob,
-        url: "" 
+        url: ""
       }));
       resolve(tracks);
     };
@@ -80,13 +82,11 @@ window.clearLibrary = async function() {
       window.App.playlist = [];
       window.App.videoList = [];
       window.App.currentIndex = -1;
-      window.App.parsedLyrics = [];
       window.renderTrackList();
-      window.renderVideoList();
+      window.renderVideoList("");
       
       const audio = document.getElementById("audioElement");
       if (audio) { audio.pause(); audio.src = ""; }
-      
       const video = document.getElementById("mainVideoPlayer");
       if (video) { video.pause(); video.src = ""; }
 
