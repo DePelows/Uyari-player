@@ -1,4 +1,4 @@
-const CACHE_NAME = "vortice-cache-v8";
+const CACHE_NAME = "vortice-cache-v12";
 
 const ASSETS_TO_CACHE = [
   "./",
