@@ -1,10 +1,12 @@
-let audioA = document.getElementById("audioA");
-let audioB = document.getElementById("audioB");
+let audioA = null;
+let audioB = null;
+let activeAudio = null;
+let inactiveAudio = null;
 
-// Referencia al audio que está sonando actualmente
-let activeAudio = audioA;
-let inactiveAudio = audioB;
+let isShuffle = false;
+let repeatMode = "off"; // "off" | "all" | "one"
 
+// Referencias a la UI
 const btnPlayPause = document.getElementById("btnPlayPause");
 const playIcon = document.getElementById("playIcon");
 const pauseIcon = document.getElementById("pauseIcon");
@@ -19,9 +21,6 @@ const currentTimeLabel = document.getElementById("currentTime");
 const totalDurationLabel = document.getElementById("totalDuration");
 const volumeSlider = document.getElementById("volumeSlider");
 
-let isShuffle = false;
-let repeatMode = "off"; // "off" | "all" | "one"
-
 function formatTime(seconds) {
   if (isNaN(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -29,8 +28,33 @@ function formatTime(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
-// Configuración de eventos de los dos canales de audio
-function attachAudioEvents(audioEl) {
+// Inicialización segura de los canales de audio
+function initAudioElements() {
+  if (!audioA || !audioB) {
+    audioA = document.getElementById("audioA");
+    audioB = document.getElementById("audioB");
+
+    // Si por alguna razón no existen, los crea dinámicamente
+    if (!audioA) {
+      audioA = document.createElement("audio");
+      audioA.id = "audioA";
+      document.body.appendChild(audioA);
+    }
+    if (!audioB) {
+      audioB = document.createElement("audio");
+      audioB.id = "audioB";
+      document.body.appendChild(audioB);
+    }
+
+    activeAudio = audioA;
+    inactiveAudio = audioB;
+
+    setupEvents(audioA);
+    setupEvents(audioB);
+  }
+}
+
+function setupEvents(audioEl) {
   audioEl.addEventListener("play", () => {
     if (audioEl === activeAudio) {
       playIcon.style.display = "none";
@@ -66,7 +90,6 @@ function attachAudioEvents(audioEl) {
     }
   });
 
-  // Al terminar la canción, dispara la siguiente de forma fluida
   audioEl.addEventListener("ended", () => {
     if (audioEl === activeAudio) {
       playNextTrack(true);
@@ -74,42 +97,45 @@ function attachAudioEvents(audioEl) {
   });
 }
 
-attachAudioEvents(audioA);
-attachAudioEvents(audioB);
-
-// Carga y reproducción usando el canal alterno
+// Carga y reproducción segura
 window.loadTrack = function(index, autoPlay = false) {
+  initAudioElements();
+
   if (index < 0 || index >= window.App.playlist.length) return;
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
-  // Alternar el canal inactivo para convertirlo en el nuevo canal activo
+  // Si ya había una canción sonando, alternamos al otro elemento de audio
   const prevAudio = activeAudio;
-  activeAudio = inactiveAudio;
+  activeAudio = (activeAudio === audioA) ? audioB : audioA;
   inactiveAudio = prevAudio;
 
-  // Asignar el nuevo track al nuevo canal activo
+  // Asignar archivo
   activeAudio.src = track.url;
 
   if (autoPlay) {
     const playPromise = activeAudio.play();
     if (playPromise !== undefined) {
       playPromise.then(() => {
-        // Detener el canal anterior solo cuando el nuevo ya arrancó
-        prevAudio.pause();
-        prevAudio.currentTime = 0;
+        // Pausar y resetear el anterior sólo cuando el nuevo ya arrancó
+        if (prevAudio && prevAudio !== activeAudio) {
+          prevAudio.pause();
+          prevAudio.currentTime = 0;
+        }
       }).catch((err) => {
-        console.warn("Error en reproducción:", err);
+        console.warn("Reproducción cancelada por el sistema:", err);
       });
     }
   } else {
-    prevAudio.pause();
-    prevAudio.currentTime = 0;
+    if (prevAudio && prevAudio !== activeAudio) {
+      prevAudio.pause();
+      prevAudio.currentTime = 0;
+    }
   }
 
   updateMediaSession(track);
 
-  // Actualizar la interfaz sin bloquear el proceso de audio
+  // Actualización diferida de la interfaz para no congelar el evento de toque
   setTimeout(() => {
     window.currentLyricIndex = -1;
 
@@ -136,8 +162,10 @@ function playNextTrack(isAutoEnded = false) {
   if (total === 0) return;
 
   if (isAutoEnded && repeatMode === "one") {
-    activeAudio.currentTime = 0;
-    activeAudio.play().catch(e => console.warn(e));
+    if (activeAudio) {
+      activeAudio.currentTime = 0;
+      activeAudio.play().catch(e => console.warn(e));
+    }
     return;
   }
 
@@ -157,7 +185,7 @@ function playPrevTrack() {
   const total = window.App.playlist.length;
   if (total === 0) return;
 
-  if (activeAudio.currentTime > 3) {
+  if (activeAudio && activeAudio.currentTime > 3) {
     activeAudio.currentTime = 0;
     return;
   }
@@ -198,24 +226,25 @@ function updateMediaSession(track) {
     navigator.mediaSession.playbackState = "playing";
 
     navigator.mediaSession.setActionHandler("play", () => {
-      activeAudio.play();
-      navigator.mediaSession.playbackState = "playing";
+      initAudioElements();
+      if (activeAudio) activeAudio.play();
     });
     navigator.mediaSession.setActionHandler("pause", () => {
-      activeAudio.pause();
-      navigator.mediaSession.playbackState = "paused";
+      if (activeAudio) activeAudio.pause();
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => playPrevTrack());
     navigator.mediaSession.setActionHandler("nexttrack", () => playNextTrack());
   }
 }
 
-// Controles
+// Botón Play/Pause principal
 btnPlayPause.addEventListener("click", () => {
-  if (activeAudio.paused) {
+  initAudioElements();
+
+  if (!activeAudio || activeAudio.paused) {
     if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
       window.loadTrack(0, true);
-    } else {
+    } else if (activeAudio) {
       activeAudio.play();
     }
   } else {
@@ -248,19 +277,20 @@ btnRepeat.addEventListener("click", () => {
 });
 
 timelineBar.addEventListener("click", (e) => {
+  initAudioElements();
+  if (!activeAudio || !activeAudio.duration) return;
   const rect = timelineBar.getBoundingClientRect();
   const clickX = e.clientX - rect.left;
   const pct = clickX / rect.width;
-  if (activeAudio.duration) {
-    activeAudio.currentTime = pct * activeAudio.duration;
-  }
+  activeAudio.currentTime = pct * activeAudio.duration;
 });
 
 if (volumeSlider) {
   volumeSlider.addEventListener("input", (e) => {
+    initAudioElements();
     const val = parseFloat(e.target.value);
-    audioA.volume = val;
-    audioB.volume = val;
+    if (audioA) audioA.volume = val;
+    if (audioB) audioB.volume = val;
   });
 }
 
@@ -275,4 +305,9 @@ document.addEventListener("visibilitychange", () => {
       }
     }
   }
+});
+
+// Inicializar al cargar el DOM
+document.addEventListener("DOMContentLoaded", () => {
+  initAudioElements();
 });
