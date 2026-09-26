@@ -28,7 +28,7 @@ window.initDB = function() {
   });
 };
 
-// Guarda una pista en la base de datos local
+// Guarda una pista asegurando la persistencia del archivo binario
 window.saveTrackToDB = function(track) {
   return new Promise((resolve, reject) => {
     if (!dbInstance) return resolve();
@@ -50,7 +50,7 @@ window.saveTrackToDB = function(track) {
   });
 };
 
-// Carga todas las pistas guardadas y reconstruye sus ObjectURLs
+// Carga las pistas preservando el fileBlob para crear URLs vivas bajo demanda
 window.loadTracksFromDB = function() {
   return new Promise((resolve, reject) => {
     if (!dbInstance) return resolve([]);
@@ -67,7 +67,7 @@ window.loadTracksFromDB = function() {
         coverUrl: r.coverUrl,
         lrcContent: r.lrcContent,
         fileBlob: r.fileBlob,
-        url: r.fileBlob ? URL.createObjectURL(r.fileBlob) : ""
+        url: "" // Se genera en caliente al tocar la pista
       }));
       resolve(tracks);
     };
