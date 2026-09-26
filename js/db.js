@@ -1,10 +1,9 @@
 const DB_NAME = "VorticeMusicDB";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Subimos versión por precaución al añadir 'type'
 const STORE_NAME = "tracks";
 
 let dbInstance = null;
 
-// Inicializa IndexedDB
 window.initDB = function() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -21,22 +20,18 @@ window.initDB = function() {
       resolve(dbInstance);
     };
 
-    request.onerror = (e) => {
-      console.error("Error al abrir IndexedDB:", e.target.error);
-      reject(e.target.error);
-    };
+    request.onerror = (e) => reject(e.target.error);
   });
 };
 
-// Guarda una pista asegurando la persistencia del archivo binario
 window.saveTrackToDB = function(track) {
   return new Promise((resolve, reject) => {
     if (!dbInstance) return resolve();
-
     const transaction = dbInstance.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
 
     const record = {
+      type: track.type || 'audio', // Se guardan audios y videos marcados
       name: track.name,
       artist: track.artist,
       coverUrl: track.coverUrl,
@@ -50,11 +45,9 @@ window.saveTrackToDB = function(track) {
   });
 };
 
-// Carga las pistas preservando el fileBlob para crear URLs vivas bajo demanda
 window.loadTracksFromDB = function() {
   return new Promise((resolve, reject) => {
     if (!dbInstance) return resolve([]);
-
     const transaction = dbInstance.transaction([STORE_NAME], "readonly");
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAll();
@@ -62,12 +55,13 @@ window.loadTracksFromDB = function() {
     request.onsuccess = (e) => {
       const records = e.target.result || [];
       const tracks = records.map((r) => ({
+        type: r.type || 'audio', // Por defecto audio si era viejo
         name: r.name,
         artist: r.artist,
         coverUrl: r.coverUrl,
         lrcContent: r.lrcContent,
         fileBlob: r.fileBlob,
-        url: "" // Se genera en caliente al tocar la pista
+        url: "" 
       }));
       resolve(tracks);
     };
@@ -76,25 +70,27 @@ window.loadTracksFromDB = function() {
   });
 };
 
-// Vacía el almacén de datos
 window.clearLibrary = async function() {
-  if (!confirm("¿Deseas vaciar todas las pistas guardadas en el dispositivo?")) return;
-
+  if (!confirm("¿Deseas vaciar todas las pistas y videos guardados en el dispositivo?")) return;
   if (dbInstance) {
     const transaction = dbInstance.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     store.clear();
     transaction.oncomplete = () => {
       window.App.playlist = [];
+      window.App.videoList = [];
       window.App.currentIndex = -1;
       window.App.parsedLyrics = [];
       window.renderTrackList();
+      window.renderVideoList();
+      
       const audio = document.getElementById("audioElement");
-      if (audio) {
-        audio.pause();
-        audio.src = "";
-      }
-      location.reload();
+      if (audio) { audio.pause(); audio.src = ""; }
+      
+      const video = document.getElementById("mainVideoPlayer");
+      if (video) { video.pause(); video.src = ""; }
+
+      document.getElementById("settingsModal").classList.remove("active");
     };
   }
 };
