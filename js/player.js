@@ -16,7 +16,7 @@ const volumeSlider = document.getElementById("volumeSlider");
 let isShuffle = false;
 let repeatMode = "off"; // "off" | "all" | "one"
 
-// Formateador mm:ss
+// Formateo de tiempo mm:ss
 function formatTime(seconds) {
   if (isNaN(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -24,40 +24,50 @@ function formatTime(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
-// Carga de pista continua (sin audio.load() que rompe segundo plano)
+// Carga y reproducción continua optimizada para segundo plano
 window.loadTrack = function(index, autoPlay = false) {
   if (index < 0 || index >= window.App.playlist.length) return;
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
-  // Asignar directamente la URL
+  // 1. Prioridad absoluta: Asignar fuente multimedia
   audioElement.src = track.url;
-  window.currentLyricIndex = -1;
 
-  if (track.lrcContent) {
-    window.App.parsedLyrics = window.parseLRC(track.lrcContent);
-    window.renderLyricsView();
-  } else {
-    window.App.parsedLyrics = [];
-    const lyricsScroll = document.getElementById("lyricsScroll");
-    if (lyricsScroll) lyricsScroll.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
-    const exp = document.getElementById("expandedLyricsScroll");
-    if (exp) exp.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
-  }
-
-  window.updatePlayerUI(track);
-  window.renderTrackList();
-  updateMediaSession(track);
-
+  // 2. Si es reproducción automática, llamar a play() en la misma pila síncrona
   if (autoPlay) {
-    // play() directo dentro del ciclo para no perder el token de reproducción continua
     const playPromise = audioElement.play();
     if (playPromise !== undefined) {
       playPromise.catch((err) => {
-        console.warn("Fallo en autoplay continuo:", err);
+        console.warn("Fallo en reproducción continua:", err);
       });
     }
   }
+
+  // 3. Notificación de sistema (MediaSession) para mantener despierto el servicio multimedia de Android
+  updateMediaSession(track);
+
+  // 4. Delegar tareas pesadas del DOM a una microtarea para no colgar el hilo de audio en background
+  setTimeout(() => {
+    window.currentLyricIndex = -1;
+
+    if (track.lrcContent) {
+      window.App.parsedLyrics = window.parseLRC(track.lrcContent);
+      if (document.visibilityState === "visible") {
+        window.renderLyricsView();
+      }
+    } else {
+      window.App.parsedLyrics = [];
+      const lyricsScroll = document.getElementById("lyricsScroll");
+      if (lyricsScroll) lyricsScroll.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
+      const exp = document.getElementById("expandedLyricsScroll");
+      if (exp) exp.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
+    }
+
+    if (document.visibilityState === "visible") {
+      window.updatePlayerUI(track);
+      window.renderTrackList();
+    }
+  }, 0);
 };
 
 function playNextTrack(isAutoEnded = false) {
@@ -66,7 +76,7 @@ function playNextTrack(isAutoEnded = false) {
 
   if (isAutoEnded && repeatMode === "one") {
     audioElement.currentTime = 0;
-    audioElement.play().catch(e => console.warn(e));
+    audioElement.play().catch((e) => console.warn(e));
     return;
   }
 
@@ -113,7 +123,7 @@ function getRandomIndex() {
   return newIdx;
 }
 
-// MediaSession API con handlers obligatorios para evitar suspensión del SO
+// MediaSession API configurada de forma estricta para persistir en Android
 function updateMediaSession(track) {
   if ("mediaSession" in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -140,7 +150,7 @@ function updateMediaSession(track) {
   }
 }
 
-// Eventos de reproducción
+// Eventos de interfaz
 btnPlayPause.addEventListener("click", () => {
   if (audioElement.paused) {
     if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
@@ -193,20 +203,19 @@ audioElement.addEventListener("timeupdate", () => {
   const cur = audioElement.currentTime;
   const dur = audioElement.duration;
 
-  if (dur) {
+  if (dur && document.visibilityState === "visible") {
     const pct = (cur / dur) * 100;
     timelineFill.style.width = `${pct}%`;
     currentTimeLabel.textContent = formatTime(cur);
+    window.syncLyrics(cur);
   }
-
-  window.syncLyrics(cur);
 });
 
 audioElement.addEventListener("loadedmetadata", () => {
   totalDurationLabel.textContent = formatTime(audioElement.duration);
 });
 
-// Evento ended: encadena inmediatamente sin demoras
+// Evento ended sin bloqueos de sincronía
 audioElement.addEventListener("ended", () => {
   playNextTrack(true);
 });
@@ -225,3 +234,17 @@ if (volumeSlider) {
     audioElement.volume = parseFloat(e.target.value);
   });
 }
+
+// Cuando la app vuelve a primer plano, actualizar la UI por si cambió en segundo plano
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && window.App.currentIndex !== -1) {
+    const currentTrack = window.App.playlist[window.App.currentIndex];
+    if (currentTrack) {
+      window.updatePlayerUI(currentTrack);
+      window.renderTrackList();
+      if (currentTrack.lrcContent) {
+        window.renderLyricsView();
+      }
+    }
+  }
+});
