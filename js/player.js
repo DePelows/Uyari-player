@@ -16,7 +16,7 @@ const volumeSlider = document.getElementById("volumeSlider");
 let isShuffle = false;
 let repeatMode = "off"; // "off" | "all" | "one"
 
-// Formateador de tiempo mm:ss
+// Formateador mm:ss
 function formatTime(seconds) {
   if (isNaN(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -24,14 +24,14 @@ function formatTime(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
-// Carga una pista esperando canplay para prevenir bloqueos de autoplay en móviles
+// Carga de pista continua (sin audio.load() que rompe segundo plano)
 window.loadTrack = function(index, autoPlay = false) {
   if (index < 0 || index >= window.App.playlist.length) return;
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
+  // Asignar directamente la URL
   audioElement.src = track.url;
-  audioElement.load();
   window.currentLyricIndex = -1;
 
   if (track.lrcContent) {
@@ -39,7 +39,8 @@ window.loadTrack = function(index, autoPlay = false) {
     window.renderLyricsView();
   } else {
     window.App.parsedLyrics = [];
-    document.getElementById("lyricsScroll").innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
+    const lyricsScroll = document.getElementById("lyricsScroll");
+    if (lyricsScroll) lyricsScroll.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
     const exp = document.getElementById("expandedLyricsScroll");
     if (exp) exp.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
   }
@@ -49,14 +50,13 @@ window.loadTrack = function(index, autoPlay = false) {
   updateMediaSession(track);
 
   if (autoPlay) {
-    const onCanPlay = () => {
-      audioElement.removeEventListener("canplay", onCanPlay);
-      const playPromise = audioElement.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => console.warn("Autoplay controlado por navegador móvil:", err));
-      }
-    };
-    audioElement.addEventListener("canplay", onCanPlay);
+    // play() directo dentro del ciclo para no perder el token de reproducción continua
+    const playPromise = audioElement.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn("Fallo en autoplay continuo:", err);
+      });
+    }
   }
 };
 
@@ -66,7 +66,7 @@ function playNextTrack(isAutoEnded = false) {
 
   if (isAutoEnded && repeatMode === "one") {
     audioElement.currentTime = 0;
-    audioElement.play();
+    audioElement.play().catch(e => console.warn(e));
     return;
   }
 
@@ -113,7 +113,7 @@ function getRandomIndex() {
   return newIdx;
 }
 
-// MediaSession API para pantalla de bloqueo y barra de notificaciones del celular
+// MediaSession API con handlers obligatorios para evitar suspensión del SO
 function updateMediaSession(track) {
   if ("mediaSession" in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -125,14 +125,22 @@ function updateMediaSession(track) {
         : [{ src: "icon.svg", sizes: "512x512", type: "image/svg+xml" }]
     });
 
-    navigator.mediaSession.setActionHandler("play", () => audioElement.play());
-    navigator.mediaSession.setActionHandler("pause", () => audioElement.pause());
+    navigator.mediaSession.playbackState = "playing";
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      audioElement.play();
+      navigator.mediaSession.playbackState = "playing";
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      audioElement.pause();
+      navigator.mediaSession.playbackState = "paused";
+    });
     navigator.mediaSession.setActionHandler("previoustrack", () => playPrevTrack());
     navigator.mediaSession.setActionHandler("nexttrack", () => playNextTrack());
   }
 }
 
-// Controles y eventos
+// Eventos de reproducción
 btnPlayPause.addEventListener("click", () => {
   if (audioElement.paused) {
     if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
@@ -148,11 +156,13 @@ btnPlayPause.addEventListener("click", () => {
 audioElement.addEventListener("play", () => {
   playIcon.style.display = "none";
   pauseIcon.style.display = "block";
+  if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
 });
 
 audioElement.addEventListener("pause", () => {
   playIcon.style.display = "block";
   pauseIcon.style.display = "none";
+  if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
 });
 
 btnNext.addEventListener("click", () => playNextTrack());
@@ -196,6 +206,7 @@ audioElement.addEventListener("loadedmetadata", () => {
   totalDurationLabel.textContent = formatTime(audioElement.duration);
 });
 
+// Evento ended: encadena inmediatamente sin demoras
 audioElement.addEventListener("ended", () => {
   playNextTrack(true);
 });
