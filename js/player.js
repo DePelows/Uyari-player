@@ -1,12 +1,4 @@
-let audioA = null;
-let audioB = null;
-let activeAudio = null;
-let inactiveAudio = null;
-
-let isShuffle = false;
-let repeatMode = "off"; // "off" | "all" | "one"
-
-// Referencias a la UI
+const audioElement = document.getElementById("audioElement");
 const btnPlayPause = document.getElementById("btnPlayPause");
 const playIcon = document.getElementById("playIcon");
 const pauseIcon = document.getElementById("pauseIcon");
@@ -21,6 +13,10 @@ const currentTimeLabel = document.getElementById("currentTime");
 const totalDurationLabel = document.getElementById("totalDuration");
 const volumeSlider = document.getElementById("volumeSlider");
 
+let isShuffle = false;
+let repeatMode = "off"; // "off" | "all" | "one"
+let currentBlobUrl = null;
+
 function formatTime(seconds) {
   if (isNaN(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -28,133 +24,55 @@ function formatTime(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
-// Inicialización segura de los canales de audio
-function initAudioElements() {
-  if (!audioA || !audioB) {
-    audioA = document.getElementById("audioA");
-    audioB = document.getElementById("audioB");
-
-    // Si por alguna razón no existen, los crea dinámicamente
-    if (!audioA) {
-      audioA = document.createElement("audio");
-      audioA.id = "audioA";
-      document.body.appendChild(audioA);
-    }
-    if (!audioB) {
-      audioB = document.createElement("audio");
-      audioB.id = "audioB";
-      document.body.appendChild(audioB);
-    }
-
-    activeAudio = audioA;
-    inactiveAudio = audioB;
-
-    setupEvents(audioA);
-    setupEvents(audioB);
-  }
-}
-
-function setupEvents(audioEl) {
-  audioEl.addEventListener("play", () => {
-    if (audioEl === activeAudio) {
-      playIcon.style.display = "none";
-      pauseIcon.style.display = "block";
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
-    }
-  });
-
-  audioEl.addEventListener("pause", () => {
-    if (audioEl === activeAudio) {
-      playIcon.style.display = "block";
-      pauseIcon.style.display = "none";
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
-    }
-  });
-
-  audioEl.addEventListener("timeupdate", () => {
-    if (audioEl !== activeAudio) return;
-    const cur = audioEl.currentTime;
-    const dur = audioEl.duration;
-
-    if (dur && document.visibilityState === "visible") {
-      const pct = (cur / dur) * 100;
-      timelineFill.style.width = `${pct}%`;
-      currentTimeLabel.textContent = formatTime(cur);
-      window.syncLyrics(cur);
-    }
-  });
-
-  audioEl.addEventListener("loadedmetadata", () => {
-    if (audioEl === activeAudio) {
-      totalDurationLabel.textContent = formatTime(audioEl.duration);
-    }
-  });
-
-  audioEl.addEventListener("ended", () => {
-    if (audioEl === activeAudio) {
-      playNextTrack(true);
-    }
-  });
-}
-
-// Carga y reproducción segura
+// Carga directa con generación de puntero local bajo demanda
 window.loadTrack = function(index, autoPlay = false) {
-  initAudioElements();
-
   if (index < 0 || index >= window.App.playlist.length) return;
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
-  // Si ya había una canción sonando, alternamos al otro elemento de audio
-  const prevAudio = activeAudio;
-  activeAudio = (activeAudio === audioA) ? audioB : audioA;
-  inactiveAudio = prevAudio;
+  // 1. Liberar URL previa para no saturar memoria en móviles
+  if (currentBlobUrl) {
+    try {
+      URL.revokeObjectURL(currentBlobUrl);
+    } catch (e) {}
+  }
 
-  // Asignar archivo
-  activeAudio.src = track.url;
+  // 2. Crear URL fresca del blob guardado en IndexedDB
+  if (track.fileBlob) {
+    currentBlobUrl = URL.createObjectURL(track.fileBlob);
+    audioElement.src = currentBlobUrl;
+  } else if (track.url) {
+    audioElement.src = track.url;
+  }
 
+  // 3. Ejecutar play() en el mismo hilo síncrono
   if (autoPlay) {
-    const playPromise = activeAudio.play();
+    const playPromise = audioElement.play();
     if (playPromise !== undefined) {
-      playPromise.then(() => {
-        // Pausar y resetear el anterior sólo cuando el nuevo ya arrancó
-        if (prevAudio && prevAudio !== activeAudio) {
-          prevAudio.pause();
-          prevAudio.currentTime = 0;
-        }
-      }).catch((err) => {
-        console.warn("Reproducción cancelada por el sistema:", err);
+      playPromise.catch((err) => {
+        console.warn("Reproducción en espera:", err);
       });
-    }
-  } else {
-    if (prevAudio && prevAudio !== activeAudio) {
-      prevAudio.pause();
-      prevAudio.currentTime = 0;
     }
   }
 
+  // 4. Registrar sesión en Android (MediaSession)
   updateMediaSession(track);
 
-  // Actualización diferida de la interfaz para no congelar el evento de toque
-  setTimeout(() => {
-    window.currentLyricIndex = -1;
+  // 5. Letras y UI
+  window.currentLyricIndex = -1;
+  if (track.lrcContent) {
+    window.App.parsedLyrics = window.parseLRC(track.lrcContent);
+    window.renderLyricsView();
+  } else {
+    window.App.parsedLyrics = [];
+    const ls = document.getElementById("lyricsScroll");
+    if (ls) ls.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
+    const exp = document.getElementById("expandedLyricsScroll");
+    if (exp) exp.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
+  }
 
-    if (track.lrcContent) {
-      window.App.parsedLyrics = window.parseLRC(track.lrcContent);
-      if (document.visibilityState === "visible") window.renderLyricsView();
-    } else {
-      window.App.parsedLyrics = [];
-      const ls = document.getElementById("lyricsScroll");
-      if (ls) ls.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
-      const exp = document.getElementById("expandedLyricsScroll");
-      if (exp) exp.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
-    }
-
-    if (document.visibilityState === "visible") {
-      window.updatePlayerUI(track);
-      window.renderTrackList();
-    }
-  }, 0);
+  window.updatePlayerUI(track);
+  window.renderTrackList();
 };
 
 function playNextTrack(isAutoEnded = false) {
@@ -162,10 +80,8 @@ function playNextTrack(isAutoEnded = false) {
   if (total === 0) return;
 
   if (isAutoEnded && repeatMode === "one") {
-    if (activeAudio) {
-      activeAudio.currentTime = 0;
-      activeAudio.play().catch(e => console.warn(e));
-    }
+    audioElement.currentTime = 0;
+    audioElement.play().catch(e => console.warn(e));
     return;
   }
 
@@ -185,8 +101,8 @@ function playPrevTrack() {
   const total = window.App.playlist.length;
   if (total === 0) return;
 
-  if (activeAudio && activeAudio.currentTime > 3) {
-    activeAudio.currentTime = 0;
+  if (audioElement.currentTime > 3) {
+    audioElement.currentTime = 0;
     return;
   }
 
@@ -225,30 +141,57 @@ function updateMediaSession(track) {
 
     navigator.mediaSession.playbackState = "playing";
 
-    navigator.mediaSession.setActionHandler("play", () => {
-      initAudioElements();
-      if (activeAudio) activeAudio.play();
-    });
-    navigator.mediaSession.setActionHandler("pause", () => {
-      if (activeAudio) activeAudio.pause();
-    });
+    navigator.mediaSession.setActionHandler("play", () => audioElement.play());
+    navigator.mediaSession.setActionHandler("pause", () => audioElement.pause());
     navigator.mediaSession.setActionHandler("previoustrack", () => playPrevTrack());
     navigator.mediaSession.setActionHandler("nexttrack", () => playNextTrack());
   }
 }
 
-// Botón Play/Pause principal
-btnPlayPause.addEventListener("click", () => {
-  initAudioElements();
+// Eventos de estado de reproducción
+audioElement.addEventListener("play", () => {
+  playIcon.style.display = "none";
+  pauseIcon.style.display = "block";
+  if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+});
 
-  if (!activeAudio || activeAudio.paused) {
+audioElement.addEventListener("pause", () => {
+  playIcon.style.display = "block";
+  pauseIcon.style.display = "none";
+  if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
+});
+
+audioElement.addEventListener("timeupdate", () => {
+  const cur = audioElement.currentTime;
+  const dur = audioElement.duration;
+
+  if (dur && document.visibilityState === "visible") {
+    const pct = (cur / dur) * 100;
+    timelineFill.style.width = `${pct}%`;
+    currentTimeLabel.textContent = formatTime(cur);
+    window.syncLyrics(cur);
+  }
+});
+
+audioElement.addEventListener("loadedmetadata", () => {
+  totalDurationLabel.textContent = formatTime(audioElement.duration);
+});
+
+// Reproducción automática al culminar pista
+audioElement.addEventListener("ended", () => {
+  playNextTrack(true);
+});
+
+// Controles principales
+btnPlayPause.addEventListener("click", () => {
+  if (audioElement.paused) {
     if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
       window.loadTrack(0, true);
-    } else if (activeAudio) {
-      activeAudio.play();
+    } else {
+      audioElement.play();
     }
   } else {
-    activeAudio.pause();
+    audioElement.pause();
   }
 });
 
@@ -277,37 +220,15 @@ btnRepeat.addEventListener("click", () => {
 });
 
 timelineBar.addEventListener("click", (e) => {
-  initAudioElements();
-  if (!activeAudio || !activeAudio.duration) return;
+  if (!audioElement.duration) return;
   const rect = timelineBar.getBoundingClientRect();
   const clickX = e.clientX - rect.left;
   const pct = clickX / rect.width;
-  activeAudio.currentTime = pct * activeAudio.duration;
+  audioElement.currentTime = pct * audioElement.duration;
 });
 
 if (volumeSlider) {
   volumeSlider.addEventListener("input", (e) => {
-    initAudioElements();
-    const val = parseFloat(e.target.value);
-    if (audioA) audioA.volume = val;
-    if (audioB) audioB.volume = val;
+    audioElement.volume = parseFloat(e.target.value);
   });
 }
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && window.App.currentIndex !== -1) {
-    const currentTrack = window.App.playlist[window.App.currentIndex];
-    if (currentTrack) {
-      window.updatePlayerUI(currentTrack);
-      window.renderTrackList();
-      if (currentTrack.lrcContent) {
-        window.renderLyricsView();
-      }
-    }
-  }
-});
-
-// Inicializar al cargar el DOM
-document.addEventListener("DOMContentLoaded", () => {
-  initAudioElements();
-});
