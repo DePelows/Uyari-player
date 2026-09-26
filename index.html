@@ -196,7 +196,9 @@
     </div>
   </footer>
 
-  <audio id="audioElement" preload="metadata"></audio>
+  <!-- Doble buffer para transición continua en segundo plano -->
+  <audio id="audioA" preload="auto"></audio>
+  <audio id="audioB" preload="auto"></audio>
 
   <script src="js/jsmediatags.min.js"></script>
   <script src="js/db.js"></script>
