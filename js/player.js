@@ -22,6 +22,9 @@ let repeatMode = "off";
 window.currentAudioUrl = null;
 let lastUITime = 0;
 
+// Caché global de audios en memoria (evita pedir permiso varias veces)
+window.__audioCache = new Map();
+
 function formatTime(seconds) {
   if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -42,25 +45,63 @@ function revokeCurrentAudioUrl() {
   }
 }
 
+// ============================================================
+// loadTrack — carga y reproduce una pista
+// ============================================================
 window.loadTrack = async function (index, autoPlay = false) {
   if (index < 0 || index >= window.App.playlist.length) return;
+
+  const sameTrack = window.App.currentIndex === index && window.currentAudioUrl;
 
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
+  // ============================================
+  // MISMA CANCIÓN: reusar
+  // ============================================
+  if (sameTrack) {
+    console.log("[Player] Misma canción, reusando URL");
+    if (audioElement.src !== window.currentAudioUrl) {
+      audioElement.src = window.currentAudioUrl;
+    }
+    if (autoPlay && audioElement.paused) {
+      audioElement.play().catch((err) => console.warn("[Player] play() falló:", err));
+    }
+    window.updatePlayerUI(track);
+    return;
+  }
+
+  // ============================================
+  // CANCIÓN DIFERENTE: limpiar
+  // ============================================
   revokeCurrentAudioUrl();
 
+  // Obtener archivo con caché
   let file = null;
 
   if (track.fileBlob instanceof Blob) {
     file = track.fileBlob;
+    console.log("[Player] Audio desde track.fileBlob (memoria)");
   } else {
-    try {
-      file = await getFileFromHandle(track.type, track.path);
-    } catch (err) {
-      console.warn("[Player] No se pudo obtener el archivo:", track.path, err);
-      showReconnectBanner();
-      return;
+    if (!window.__audioCache) window.__audioCache = new Map();
+
+    if (window.__audioCache.has(track.path)) {
+      file = window.__audioCache.get(track.path);
+      track.fileBlob = file;
+      console.log("[Player] Audio desde caché global");
+    } else {
+      try {
+        console.log("[Player] Pidiendo archivo al handle:", track.path);
+        file = await getFileFromHandle(track.type, track.path);
+        if (file) {
+          window.__audioCache.set(track.path, file);
+          track.fileBlob = file;
+        }
+      } catch (err) {
+        console.warn("[Player] No se pudo obtener el archivo:", track.path, err);
+        showReconnectBanner();
+        return;
+      }
     }
   }
 
@@ -70,6 +111,7 @@ window.loadTrack = async function (index, autoPlay = false) {
     return;
   }
 
+  // Crear URL y asignar
   try {
     window.currentAudioUrl = URL.createObjectURL(file);
     audioElement.src = window.currentAudioUrl;
@@ -78,6 +120,7 @@ window.loadTrack = async function (index, autoPlay = false) {
     return;
   }
 
+  // Auto-play
   if (autoPlay) {
     const playPromise = audioElement.play();
     if (playPromise !== undefined) {
@@ -87,8 +130,10 @@ window.loadTrack = async function (index, autoPlay = false) {
     }
   }
 
+  // Media Session
   updateMediaSession(track);
 
+  // Letras
   window.currentLyricIndex = -1;
   if (track.lrcContent) {
     window.App.parsedLyrics = window.parseLRC(track.lrcContent);
@@ -105,19 +150,20 @@ window.loadTrack = async function (index, autoPlay = false) {
   if (window.renderTrackList) window.renderTrackList();
 };
 
+// ============================================================
+// getFileFromHandle — obtener archivo del handle
+// ============================================================
 async function getFileFromHandle(type, relativePath) {
   const handleId = type === "video" ? "video" : "music";
   const rootHandle = await window.loadHandleFromDB(handleId);
   if (!rootHandle) return null;
 
-  // Solo comprobar permiso. No pedir aquí.
   const perm = await rootHandle.queryPermission({ mode: "read" });
   if (perm !== "granted") {
     console.log("[Player] Permiso no concedido para", handleId);
     return null;
   }
 
-  // Navegar el path
   const parts = relativePath.split("/").filter((p) => p.length > 0);
   if (parts.length === 0) return null;
 
@@ -139,6 +185,9 @@ function showReconnectBanner() {
   if (banner) banner.style.display = "flex";
 }
 
+// ============================================================
+// Navegación entre pistas
+// ============================================================
 function playNextTrack(isAutoEnded = false) {
   const total = window.App.playlist.length;
   if (total === 0) return;
@@ -192,6 +241,9 @@ function getRandomIndex() {
   return newIdx;
 }
 
+// ============================================================
+// Media Session
+// ============================================================
 function updateMediaSession(track) {
   if (!("mediaSession" in navigator)) return;
 
@@ -223,6 +275,9 @@ function updateMediaSession(track) {
   } catch (err) {}
 }
 
+// ============================================================
+// Eventos del audio
+// ============================================================
 audioElement.addEventListener("play", () => {
   if (playIcon) playIcon.style.display = "none";
   if (pauseIcon) pauseIcon.style.display = "block";
@@ -264,20 +319,26 @@ audioElement.addEventListener("error", () => {
   console.error("[Player] Error del audio:", audioElement.error);
 });
 
+// ============================================================
+// Controles
+// ============================================================
 if (btnPlayPause) {
   btnPlayPause.addEventListener("click", async () => {
     if (audioElement.paused) {
+      // Si no hay nada cargado pero hay playlist, cargar primera
       if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
         window.loadTrack(0, true);
+        return;
+      }
+      // Si hay pista actual pero sin src, recargarla
+      if (!audioElement.src && window.App.currentIndex >= 0) {
+        window.loadTrack(window.App.currentIndex, true);
         return;
       }
       try {
         await audioElement.play();
       } catch (err) {
         console.warn("[Player] play() falló:", err.name, err.message);
-        if (!audioElement.src && window.App.currentIndex >= 0) {
-          window.loadTrack(window.App.currentIndex, true);
-        }
       }
     } else {
       audioElement.pause();
