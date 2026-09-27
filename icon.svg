@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="uyariGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A855F7"/>
-      <stop offset="100%" stop-color="#7C3AED"/>
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
     </linearGradient>
     <linearGradient id="uyariBg" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#1A1A1A"/>
@@ -10,17 +10,14 @@
     </linearGradient>
   </defs>
 
-  <!-- Fondo redondeado -->
   <rect width="512" height="512" rx="112" ry="112" fill="url(#uyariBg)"/>
 
-  <!-- Ondas concéntricas estilo vinilo -->
   <circle cx="256" cy="256" r="180" fill="none" stroke="url(#uyariGrad)" stroke-width="14" opacity="0.15"/>
   <circle cx="256" cy="256" r="140" fill="none" stroke="url(#uyariGrad)" stroke-width="14" opacity="0.3"/>
   <circle cx="256" cy="256" r="100" fill="none" stroke="url(#uyariGrad)" stroke-width="14" opacity="0.55"/>
 
-  <!-- Círculo central -->
   <circle cx="256" cy="256" r="72" fill="url(#uyariGrad)"/>
 
-  <!-- Triángulo play dentro del círculo -->
-  <path d="M 238 226 L 238 286 C 238 292 245 296 250 293 L 300 263 C 305 260 305 252 300 249 L 250 219 C 245 216 238 220 238 226 Z" fill="#000000"/>
+  <!-- Triángulo play centrado ópticamente -->
+  <path d="M 228 220 L 228 292 C 228 298 235 302 240 299 L 296 265 C 301 262 301 250 296 247 L 240 213 C 235 210 228 214 228 220 Z" fill="#000000"/>
 </svg>
