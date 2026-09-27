@@ -5,7 +5,7 @@
 //   - Cache-first para assets estáticos (icono, manifest, librerías)
 // ============================================================
 
-const CACHE_NAME = "uyari-cache-v1";
+const CACHE_NAME = "uyari-cache-v2";
 
 // Assets que se sirven desde caché siempre (cambian poco)
 const STATIC_ASSETS = [
