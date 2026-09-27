@@ -1,16 +1,10 @@
 // ============================================================
 // Uyari Player — Orquestador principal
-// - Carga de música y video con showDirectoryPicker (o fallback)
-// - Lectura recursiva de carpetas
-// - Emparejamiento automático de .lrc
-// - Registro del Service Worker
-// - Manejo del banner de reconexión
 // ============================================================
 
-// Estado global
 window.App = {
-  playlist: [],       // pistas de audio
-  videoList: [],      // pistas de video
+  playlist: [],
+  videoList: [],
   currentIndex: -1,
   parsedLyrics: [],
 };
@@ -19,13 +13,9 @@ window.App = {
 // INICIALIZACIÓN
 // ============================================================
 document.addEventListener("DOMContentLoaded", async () => {
-  // 1. Inicializar DB
   await window.initDB();
-
-  // 2. Pedir almacenamiento persistente (una vez)
   await window.requestPersistentStorage();
 
-  // 3. Cargar pistas guardadas
   const storedTracks = await window.loadTracksFromDB();
   if (storedTracks && storedTracks.length > 0) {
     window.App.playlist = storedTracks.filter((t) => t.type === "audio");
@@ -37,10 +27,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-  // 4. Detectar si necesitamos mostrar el banner de reconexión
   await checkHandlesStatus();
 
-  // 5. Registrar listeners de UI
   setupNavigation();
   setupTabs();
   setupSettingsModal();
@@ -49,39 +37,46 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupReconnectBanner();
   setupPlayerExpand();
 
-  // 6. Registrar Service Worker
   registerServiceWorker();
 });
 
 // ============================================================
-// ESTADO DE HANDLES: ¿tenemos acceso a las carpetas?
+// ESTADO DE HANDLES
 // ============================================================
 async function checkHandlesStatus() {
   const hasMusicHandle = (await window.loadHandleFromDB("music")) != null;
   const hasVideoHandle = (await window.loadHandleFromDB("video")) != null;
 
-  // Si no hay ningún handle guardado, no mostramos banner
-  // (es la primera vez, el usuario aún no ha cargado nada)
-  if (!hasMusicHandle && !hasVideoHandle) {
-    return;
-  }
+  if (!hasMusicHandle && !hasVideoHandle) return;
 
-  // Si hay handles, verificar permisos
   let needsBanner = false;
 
   if (hasMusicHandle) {
     const handle = await window.loadHandleFromDB("music");
-    const perm = await handle.queryPermission({ mode: "read" });
-    if (perm !== "granted") needsBanner = true;
+    try {
+      const perm = await handle.queryPermission({ mode: "read" });
+      console.log("[App] Permiso music:", perm);
+      if (perm !== "granted") needsBanner = true;
+    } catch (e) {
+      console.warn("[App] Error consultando permiso music:", e);
+      needsBanner = true;
+    }
   }
 
   if (!needsBanner && hasVideoHandle) {
     const handle = await window.loadHandleFromDB("video");
-    const perm = await handle.queryPermission({ mode: "read" });
-    if (perm !== "granted") needsBanner = true;
+    try {
+      const perm = await handle.queryPermission({ mode: "read" });
+      console.log("[App] Permiso video:", perm);
+      if (perm !== "granted") needsBanner = true;
+    } catch (e) {
+      console.warn("[App] Error consultando permiso video:", e);
+      needsBanner = true;
+    }
   }
 
   if (needsBanner) {
+    console.log("[App] Mostrando banner de reconexión");
     showReconnectBanner();
   }
 }
@@ -115,7 +110,7 @@ function setupNavigation() {
 }
 
 // ============================================================
-// TABS (Canciones / Artistas)
+// TABS
 // ============================================================
 function setupTabs() {
   const tabSongs = document.getElementById("tabSongs");
@@ -139,7 +134,7 @@ function setupTabs() {
 }
 
 // ============================================================
-// MODAL DE CONFIGURACIÓN
+// MODAL
 // ============================================================
 function setupSettingsModal() {
   const btnOpenSettings = document.getElementById("btnOpenSettings");
@@ -166,7 +161,7 @@ function setupSettingsModal() {
 }
 
 // ============================================================
-// SELECTOR DE TEMA
+// TEMA
 // ============================================================
 function setupThemeSelector() {
   const colorSwatches = document.querySelectorAll(".color-swatch");
@@ -183,7 +178,7 @@ function setupThemeSelector() {
 }
 
 // ============================================================
-// BOTONES DE CARGA (música / video)
+// BOTONES DE CARGA
 // ============================================================
 function setupLoadButtons() {
   const btnLoadMusic = document.getElementById("btnLoadMusic");
@@ -198,14 +193,14 @@ function setupLoadButtons() {
 }
 
 // ============================================================
-// BANNER DE RECONEXIÓN
+// BANNER RECONEXIÓN
 // ============================================================
 function setupReconnectBanner() {
   const btnReconnect = document.getElementById("btnReconnect");
   if (!btnReconnect) return;
 
   btnReconnect.addEventListener("click", async () => {
-    // Intentar reconectar ambos handles
+    console.log("[App] Reconectando handles...");
     let reconnected = false;
 
     for (const id of ["music", "video"]) {
@@ -213,7 +208,9 @@ function setupReconnectBanner() {
       if (!handle) continue;
 
       try {
+        console.log(`[App] Pidiendo permiso para ${id}...`);
         const perm = await handle.requestPermission({ mode: "read" });
+        console.log(`[App] Permiso ${id}:`, perm);
         if (perm === "granted") reconnected = true;
       } catch (err) {
         console.warn(`[App] Error reconectando ${id}:`, err);
@@ -222,13 +219,13 @@ function setupReconnectBanner() {
 
     if (reconnected) {
       hideReconnectBanner();
-      // Refrescar la app
       await window.initDB();
       const storedTracks = await window.loadTracksFromDB();
       window.App.playlist = storedTracks.filter((t) => t.type === "audio");
       window.App.videoList = storedTracks.filter((t) => t.type === "video");
       window.renderTrackList();
       window.renderVideoList("");
+      console.log("[App] Reconectado. Playlist:", window.App.playlist.length);
     } else {
       alert("No se pudo obtener el permiso. Intenta de nuevo.");
     }
@@ -246,7 +243,7 @@ function hideReconnectBanner() {
 }
 
 // ============================================================
-// PLAYER EXPANDIDO (móvil)
+// PLAYER EXPANDIDO
 // ============================================================
 function setupPlayerExpand() {
   const expandArea = document.getElementById("expandPlayerArea");
@@ -272,7 +269,6 @@ function setupPlayerExpand() {
 // ============================================================
 async function loadMusicFolder() {
   if (!window.showDirectoryPicker) {
-    // Fallback a webkitdirectory
     return fallbackLoadMusic();
   }
 
@@ -282,7 +278,7 @@ async function loadMusicFolder() {
     hideReconnectBanner();
     await processMusicDirectory(dirHandle);
   } catch (err) {
-    if (err.name === "AbortError") return; // usuario canceló
+    if (err.name === "AbortError") return;
     console.error("[App] Error al cargar música:", err);
     alert("Error al cargar la carpeta de música: " + err.message);
   }
@@ -290,15 +286,14 @@ async function loadMusicFolder() {
 
 async function processMusicDirectory(dirHandle) {
   const musicTracks = [];
-  const lrcMap = {}; // baseName → contenido LRC
+  const lrcMap = {};
 
-  // 1. Recorrer la carpeta (música es plana, no hay subcarpetas profundas)
   const entries = [];
   for await (const entry of dirHandle.values()) {
     entries.push(entry);
   }
 
-  // 2. Primero procesar todos los .lrc
+  // Primero .lrc
   for (const entry of entries) {
     if (entry.kind === "file" && entry.name.toLowerCase().endsWith(".lrc")) {
       const file = await entry.getFile();
@@ -308,7 +303,7 @@ async function processMusicDirectory(dirHandle) {
     }
   }
 
-  // 3. Procesar archivos de audio
+  // Luego audio
   const audioEntries = entries.filter(
     (e) => e.kind === "file" && /\.(mp3|m4a|wav|aac)$/i.test(e.name)
   );
@@ -326,32 +321,29 @@ async function processMusicDirectory(dirHandle) {
     const trackItem = {
       type: "audio",
       name: metadata.title || file.name.replace(/\.[^/.]+$/, ""),
-      path: `Musica/${entry.name}`, // path lógico
+      path: entry.name, // ✅ Solo el nombre del archivo
       artist: metadata.artist || "Desconocido",
       coverUrl: metadata.coverUrl || null,
       lrcContent: matchedLrc,
-      fileBlob: file, // en memoria mientras la sesión esté abierta
+      fileBlob: file,
     };
 
     musicTracks.push(trackItem);
 
     processed++;
     if (processed % 10 === 0) {
-      await new Promise((r) => setTimeout(r, 0)); // ceder hilo
+      await new Promise((r) => setTimeout(r, 0));
       console.log(`[App] Procesando ${processed}/${total}...`);
     }
   }
 
-  // 4. Guardar en DB y actualizar UI
   await window.saveManyTracksToDB(musicTracks);
 
-  // Fusionar con playlist actual (evitando duplicados)
   const existingPaths = new Set(window.App.playlist.map((t) => t.path));
   musicTracks.forEach((t) => {
     if (!existingPaths.has(t.path)) {
       window.App.playlist.push(t);
     } else {
-      // Actualizar el existente con el nuevo blob en memoria
       const idx = window.App.playlist.findIndex((x) => x.path === t.path);
       if (idx >= 0) window.App.playlist[idx] = t;
     }
@@ -362,7 +354,7 @@ async function processMusicDirectory(dirHandle) {
 }
 
 // ============================================================
-// CARGA DE VIDEOS (con subcarpetas recursivas)
+// CARGA DE VIDEOS
 // ============================================================
 async function loadVideoFolder() {
   if (!window.showDirectoryPicker) {
@@ -383,12 +375,10 @@ async function loadVideoFolder() {
 
 async function processVideoDirectory(dirHandle) {
   const videoTracks = [];
-  await walkVideoDir(dirHandle, dirHandle.name, videoTracks);
+  await walkVideoDir(dirHandle, "", videoTracks, true);
 
-  // Guardar en DB
   await window.saveManyTracksToDB(videoTracks);
 
-  // Fusionar con lista actual
   const existingPaths = new Set(window.App.videoList.map((t) => t.path));
   videoTracks.forEach((t) => {
     if (!existingPaths.has(t.path)) {
@@ -403,28 +393,30 @@ async function processVideoDirectory(dirHandle) {
   console.log(`[App] ${videoTracks.length} videos procesados`);
 }
 
-async function walkVideoDir(dirHandle, currentPath, result) {
+async function walkVideoDir(dirHandle, currentPath, result, isRoot = true) {
   for await (const entry of dirHandle.values()) {
     if (entry.kind === "file") {
       if (/\.(mp4|webm|mkv|mov)$/i.test(entry.name)) {
+        const filePath = isRoot ? entry.name : `${currentPath}/${entry.name}`;
         result.push({
           type: "video",
           name: entry.name.replace(/\.[^/.]+$/, ""),
-          path: `${currentPath}/${entry.name}`, // "Videos/Anime/Serie/Naruto/cap01.mp4"
+          path: filePath,
           artist: "Video Local",
           coverUrl: null,
           lrcContent: null,
-          fileBlob: null, // los videos se piden al handle bajo demanda
+          fileBlob: null,
         });
       }
     } else if (entry.kind === "directory") {
-      await walkVideoDir(entry, `${currentPath}/${entry.name}`, result);
+      const subPath = isRoot ? entry.name : `${currentPath}/${entry.name}`;
+      await walkVideoDir(entry, subPath, result, false);
     }
   }
 }
 
 // ============================================================
-// FALLBACK: webkitdirectory (para navegadores sin showDirectoryPicker)
+// FALLBACK webkitdirectory
 // ============================================================
 function fallbackLoadMusic() {
   const input = document.createElement("input");
@@ -505,7 +497,7 @@ function fallbackLoadVideo() {
 }
 
 // ============================================================
-// LECTURA DE METADATOS DE AUDIO (con jsmediatags)
+// METADATOS
 // ============================================================
 function readAudioMetadata(file) {
   return new Promise((resolve) => {
@@ -523,10 +515,7 @@ function readAudioMetadata(file) {
           let base64String = "";
           const chunkSize = 8192;
           for (let i = 0; i < data.length; i += chunkSize) {
-            base64String += String.fromCharCode.apply(
-              null,
-              data.slice(i, i + chunkSize)
-            );
+            base64String += String.fromCharCode.apply(null, data.slice(i, i + chunkSize));
           }
           coverUrl = `data:${format};base64,${window.btoa(base64String)}`;
         }
@@ -545,7 +534,7 @@ function readAudioMetadata(file) {
 }
 
 // ============================================================
-// PARSER DE LRC
+// PARSER LRC
 // ============================================================
 window.parseLRC = function (lrcText) {
   if (!lrcText) return [];
@@ -554,7 +543,6 @@ window.parseLRC = function (lrcText) {
   const timeExp = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/g;
 
   lines.forEach((line) => {
-    // Buscar todas las marcas de tiempo en la línea
     const times = [];
     let match;
     while ((match = timeExp.exec(line)) !== null) {
@@ -585,17 +573,13 @@ function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker
       .register("./sw.js")
-      .then((reg) => {
-        console.log("[App] SW registrado:", reg.scope);
-      })
-      .catch((err) => {
-        console.warn("[App] Error registrando SW:", err);
-      });
+      .then((reg) => console.log("[App] SW registrado:", reg.scope))
+      .catch((err) => console.warn("[App] Error registrando SW:", err));
   }
 }
 
 // ============================================================
-// REFRESCO MANUAL (por si acaso)
+// REFRESCO MANUAL
 // ============================================================
 window.refreshLibrary = async function () {
   await window.initDB();
