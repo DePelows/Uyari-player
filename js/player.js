@@ -38,6 +38,11 @@ window.pauseAudioPlayer = function () {
   }
 };
 
+// Bloquea la reproducción de audio si hay un video en PiP
+window.isAudioBlockedByPiP = function () {
+  return document.pictureInPictureElement != null;
+};
+
 function revokeCurrentAudioUrl() {
   if (window.currentAudioUrl) {
     try { URL.revokeObjectURL(window.currentAudioUrl); } catch (e) {}
@@ -51,14 +56,18 @@ function revokeCurrentAudioUrl() {
 window.loadTrack = async function (index, autoPlay = false) {
   if (index < 0 || index >= window.App.playlist.length) return;
 
+  // Si hay un video en PiP, bloquear música
+  if (window.isAudioBlockedByPiP && window.isAudioBlockedByPiP()) {
+    console.log("[Player] Bloqueado: hay un video en PiP");
+    return;
+  }
+
   const sameTrack = window.App.currentIndex === index && window.currentAudioUrl;
 
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
-  // ============================================
   // MISMA CANCIÓN: reusar
-  // ============================================
   if (sameTrack) {
     console.log("[Player] Misma canción, reusando URL");
     if (audioElement.src !== window.currentAudioUrl) {
@@ -71,9 +80,7 @@ window.loadTrack = async function (index, autoPlay = false) {
     return;
   }
 
-  // ============================================
   // CANCIÓN DIFERENTE: limpiar
-  // ============================================
   revokeCurrentAudioUrl();
 
   // Obtener archivo con caché
@@ -324,6 +331,12 @@ audioElement.addEventListener("error", () => {
 // ============================================================
 if (btnPlayPause) {
   btnPlayPause.addEventListener("click", async () => {
+    // Si hay un video en PiP, no permitir reproducir música
+    if (window.isAudioBlockedByPiP && window.isAudioBlockedByPiP()) {
+      console.log("[Player] Play bloqueado: hay PiP activo");
+      return;
+    }
+
     if (audioElement.paused) {
       // Si no hay nada cargado pero hay playlist, cargar primera
       if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
