@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Uyari Player — Reproductor de música y video offline" />
   <title>Uyari Player — Reproductor</title>
   
   <link rel="stylesheet" href="css/main.css" />
@@ -36,16 +38,24 @@
       </nav>
       
       <div class="sidebar-folder-picker">
-        <label for="folderInput" class="btn-load-folder">
-          Cargar Archivos / Carpeta
-        </label>
-        <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" />
+        <button type="button" id="btnLoadMusic" class="btn-load-folder">
+          🎵 Cargar Música
+        </button>
+        <button type="button" id="btnLoadVideo" class="btn-load-folder" style="margin-top: 8px;">
+          🎬 Cargar Videos
+        </button>
       </div>
     </aside>
 
     <!-- Contenido Principal -->
     <main class="main-content">
       
+      <!-- Banner de reconexión de carpeta (oculto por defecto) -->
+      <div id="reconnectBanner" class="reconnect-banner" style="display: none;">
+        <span>🔒 Pulsa aquí para acceder a tu música</span>
+        <button type="button" id="btnReconnect" class="btn-reconnect">Permitir</button>
+      </div>
+
       <!-- SECCIÓN AUDIO -->
       <section id="viewAudio" class="view-panel active">
         <header class="content-header">
@@ -56,10 +66,9 @@
             </div>
             
             <div class="header-actions">
-              <label for="folderInputHeader" class="btn-add-music-mobile" title="Añadir archivos">
+              <button type="button" id="btnLoadMusicHeader" class="btn-add-music-mobile" title="Añadir música">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              </label>
-              <input type="file" id="folderInputHeader" webkitdirectory directory multiple style="display: none;" />
+              </button>
               
               <button id="btnOpenSettings" class="btn-icon-top" title="Configuración">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
@@ -82,8 +91,7 @@
           <div class="track-list" id="trackListContainer">
             <div class="empty-state">
               <p>No hay música local cargada.</p>
-              <label for="folderInputMobile" class="btn-empty-load">Cargar Carpeta</label>
-              <input type="file" id="folderInputMobile" webkitdirectory directory multiple style="display: none;" />
+              <button type="button" class="btn-empty-load" onclick="document.getElementById('btnLoadMusic').click()">Cargar Música</button>
             </div>
           </div>
 
@@ -96,13 +104,18 @@
         </div>
       </section>
 
-      <!-- SECCIÓN VIDEO (Con navegación de carpetas) -->
+      <!-- SECCIÓN VIDEO -->
       <section id="viewVideo" class="view-panel">
         <header class="content-header">
           <div class="header-title-row">
             <div>
               <h1>Video</h1>
               <p class="subtext">Explora tus series, anime y películas locales</p>
+            </div>
+            <div class="header-actions">
+              <button type="button" id="btnLoadVideoHeader" class="btn-add-music-mobile" title="Añadir videos">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </button>
             </div>
           </div>
         </header>
@@ -114,7 +127,6 @@
           </div>
         </div>
 
-        <!-- Mígas de pan para navegar (NUEVO) -->
         <div class="video-breadcrumbs" id="videoBreadcrumbs">
           <span class="breadcrumb-item active" onclick="window.renderVideoList('')">Inicio</span>
         </div>
@@ -122,6 +134,7 @@
         <div class="video-grid" id="videoGridContainer">
           <div class="empty-state">
             <p>No se encontraron videos en la carpeta cargada.</p>
+            <button type="button" class="btn-empty-load" onclick="document.getElementById('btnLoadVideo').click()">Cargar Videos</button>
           </div>
         </div>
       </section>
@@ -176,8 +189,8 @@
         <button class="control-btn" id="btnShuffle"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
         <button class="control-btn" id="btnPrev"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
         <button class="control-btn btn-play-main" id="btnPlayPause">
-          <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          <svg id="pauseIcon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5.14v13.72c0 .8.87 1.3 1.56.9l11.02-6.86c.65-.4.65-1.4 0-1.8L9.56 4.24C8.87 3.84 8 4.34 8 5.14z"/></svg>
+          <svg id="pauseIcon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="display:none;"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
         </button>
         <button class="control-btn" id="btnNext"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
         <button class="control-btn" id="btnRepeat">
