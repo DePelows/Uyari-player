@@ -1,9 +1,5 @@
 // ============================================================
 // Uyari Player — Reproductor de audio
-// - Reproducción bajo demanda desde FileSystemFileHandle
-// - Throttle de timeupdate (250ms) para ahorrar batería
-// - Manejo robusto de object URLs (revocación)
-// - Media Session API
 // ============================================================
 
 const audioElement = document.getElementById("audioElement");
@@ -21,17 +17,10 @@ const currentTimeLabel = document.getElementById("currentTime");
 const totalDurationLabel = document.getElementById("totalDuration");
 const volumeSlider = document.getElementById("volumeSlider");
 
-// Estado del reproductor
 let isShuffle = false;
-let repeatMode = "off"; // "off" | "all" | "one"
-window.currentAudioUrl = null; // expuesto globalmente para que clearLibrary lo revoque
-
-// Throttle de UI
+let repeatMode = "off";
+window.currentAudioUrl = null;
 let lastUITime = 0;
-
-// ============================================================
-// Utilidades
-// ============================================================
 
 function formatTime(seconds) {
   if (isNaN(seconds) || !isFinite(seconds)) return "0:00";
@@ -40,45 +29,32 @@ function formatTime(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
-// Pausa el audio (para usar desde video)
 window.pauseAudioPlayer = function () {
   if (audioElement && !audioElement.paused) {
     audioElement.pause();
   }
 };
 
-// Revoca la URL anterior si existe
 function revokeCurrentAudioUrl() {
   if (window.currentAudioUrl) {
-    try {
-      URL.revokeObjectURL(window.currentAudioUrl);
-    } catch (e) {
-      // Ignorar
-    }
+    try { URL.revokeObjectURL(window.currentAudioUrl); } catch (e) {}
     window.currentAudioUrl = null;
   }
 }
 
-// ============================================================
-// loadTrack — carga una pista por índice y opcionalmente reproduce
-// ============================================================
 window.loadTrack = async function (index, autoPlay = false) {
   if (index < 0 || index >= window.App.playlist.length) return;
 
   window.App.currentIndex = index;
   const track = window.App.playlist[index];
 
-  // 1. Revocar URL anterior
   revokeCurrentAudioUrl();
 
-  // 2. Obtener el archivo (desde handle o desde blob en memoria)
   let file = null;
 
-  // Si ya tenemos el blob en memoria (cargado justo tras seleccionar carpeta)
   if (track.fileBlob instanceof Blob) {
     file = track.fileBlob;
   } else {
-    // Pedir el archivo al handle bajo demanda
     try {
       file = await getFileFromHandle(track.type, track.path);
     } catch (err) {
@@ -94,7 +70,6 @@ window.loadTrack = async function (index, autoPlay = false) {
     return;
   }
 
-  // 3. Crear object URL y asignar
   try {
     window.currentAudioUrl = URL.createObjectURL(file);
     audioElement.src = window.currentAudioUrl;
@@ -103,24 +78,17 @@ window.loadTrack = async function (index, autoPlay = false) {
     return;
   }
 
-  // 4. Auto-play si aplica
   if (autoPlay) {
     const playPromise = audioElement.play();
     if (playPromise !== undefined) {
       playPromise.catch((err) => {
         console.warn("[Player] play() falló:", err.name, err.message);
-        // NotAllowedError = autoplay bloqueado
-        if (err.name === "NotAllowedError") {
-          console.warn("[Player] Autoplay bloqueado por el navegador");
-        }
       });
     }
   }
 
-  // 5. Media Session
   updateMediaSession(track);
 
-  // 6. Letras
   window.currentLyricIndex = -1;
   if (track.lrcContent) {
     window.App.parsedLyrics = window.parseLRC(track.lrcContent);
@@ -133,33 +101,24 @@ window.loadTrack = async function (index, autoPlay = false) {
     if (exp) exp.innerHTML = `<p class="no-lyrics">No hay archivo .lrc para esta pista.</p>`;
   }
 
-  // 7. UI
   window.updatePlayerUI(track);
   if (window.renderTrackList) window.renderTrackList();
 };
 
-// ============================================================
-// getFileFromHandle — obtiene un File desde el handle guardado
-// ============================================================
 async function getFileFromHandle(type, relativePath) {
   const handleId = type === "video" ? "video" : "music";
   const rootHandle = await window.loadHandleFromDB(handleId);
   if (!rootHandle) return null;
 
-  // Verificar permiso
+  // Solo comprobar permiso. No pedir aquí.
   const perm = await rootHandle.queryPermission({ mode: "read" });
   if (perm !== "granted") {
-    const req = await rootHandle.requestPermission({ mode: "read" });
-    if (req !== "granted") return null;
+    console.log("[Player] Permiso no concedido para", handleId);
+    return null;
   }
 
-  // Navegar por el path relativo
+  // Navegar el path
   const parts = relativePath.split("/").filter((p) => p.length > 0);
-  // Si el primer segmento coincide con el nombre de la carpeta raíz, quitarlo
-  if (parts.length > 0 && parts[0] === rootHandle.name) {
-    parts.shift();
-  }
-
   if (parts.length === 0) return null;
 
   let currentDir = rootHandle;
@@ -175,22 +134,15 @@ async function getFileFromHandle(type, relativePath) {
   }
 }
 
-// ============================================================
-// Mostrar banner de reconexión
-// ============================================================
 function showReconnectBanner() {
   const banner = document.getElementById("reconnectBanner");
   if (banner) banner.style.display = "flex";
 }
 
-// ============================================================
-// playNextTrack / playPrevTrack
-// ============================================================
 function playNextTrack(isAutoEnded = false) {
   const total = window.App.playlist.length;
   if (total === 0) return;
 
-  // Repeat one: reiniciar la misma
   if (isAutoEnded && repeatMode === "one") {
     audioElement.currentTime = 0;
     audioElement.play().catch((e) => console.warn(e));
@@ -213,7 +165,6 @@ function playPrevTrack() {
   const total = window.App.playlist.length;
   if (total === 0) return;
 
-  // Si lleva más de 3s, reiniciar
   if (audioElement.currentTime > 3) {
     audioElement.currentTime = 0;
     return;
@@ -241,9 +192,6 @@ function getRandomIndex() {
   return newIdx;
 }
 
-// ============================================================
-// Media Session API
-// ============================================================
 function updateMediaSession(track) {
   if (!("mediaSession" in navigator)) return;
 
@@ -272,14 +220,9 @@ function updateMediaSession(track) {
     navigator.mediaSession.setActionHandler("seekto", (d) => {
       if (d.seekTime != null) audioElement.currentTime = d.seekTime;
     });
-  } catch (err) {
-    // Algunos handlers no soportados
-  }
+  } catch (err) {}
 }
 
-// ============================================================
-// Eventos del elemento <audio>
-// ============================================================
 audioElement.addEventListener("play", () => {
   if (playIcon) playIcon.style.display = "none";
   if (pauseIcon) pauseIcon.style.display = "block";
@@ -292,7 +235,6 @@ audioElement.addEventListener("pause", () => {
   if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
 });
 
-// THROTTLE: solo actualizar UI cada 250ms (ahorra batería en móvil)
 audioElement.addEventListener("timeupdate", () => {
   const now = performance.now();
   if (now - lastUITime < 250) return;
@@ -318,17 +260,13 @@ audioElement.addEventListener("ended", () => {
   playNextTrack(true);
 });
 
-audioElement.addEventListener("error", (e) => {
+audioElement.addEventListener("error", () => {
   console.error("[Player] Error del audio:", audioElement.error);
 });
 
-// ============================================================
-// Controles de UI
-// ============================================================
 if (btnPlayPause) {
   btnPlayPause.addEventListener("click", async () => {
     if (audioElement.paused) {
-      // Si no hay nada cargado, cargar primera pista
       if (window.App.currentIndex === -1 && window.App.playlist.length > 0) {
         window.loadTrack(0, true);
         return;
@@ -337,7 +275,6 @@ if (btnPlayPause) {
         await audioElement.play();
       } catch (err) {
         console.warn("[Player] play() falló:", err.name, err.message);
-        // Si el src no está definido, cargar la pista actual
         if (!audioElement.src && window.App.currentIndex >= 0) {
           window.loadTrack(window.App.currentIndex, true);
         }
@@ -376,7 +313,6 @@ if (btnRepeat) {
   });
 }
 
-// Timeline: click para buscar
 if (timelineBar) {
   timelineBar.addEventListener("click", (e) => {
     if (!audioElement.duration) return;
@@ -386,7 +322,6 @@ if (timelineBar) {
   });
 }
 
-// Volumen
 if (volumeSlider) {
   audioElement.volume = parseFloat(volumeSlider.value);
   volumeSlider.addEventListener("input", (e) => {
