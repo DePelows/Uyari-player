@@ -185,51 +185,8 @@ window.renderVideoList = function (path = "") {
         <div class="video-info-box">${escapeHtml(videoItem.name)}</div>
       `;
 
-      card.addEventListener("click", async () => {
-        if (window.pauseAudioPlayer) window.pauseAudioPlayer();
-
-        const videoWrapper = document.getElementById("videoPlayerWrapper");
-        const videoPlayer = document.getElementById("mainVideoPlayer");
-        const videoTitle = document.getElementById("videoTitleDisplay");
-
-        videoPlayer.pause();
-        videoPlayer.removeAttribute("src");
-        videoPlayer.load();
-        if (window.currentVideoUrl) {
-          try { URL.revokeObjectURL(window.currentVideoUrl); } catch (e) {}
-          window.currentVideoUrl = null;
-        }
-
-        videoWrapper.style.display = "block";
-        videoTitle.textContent = videoItem.name;
-
-        let file = null;
-        if (videoItem.fileBlob instanceof Blob) {
-          file = videoItem.fileBlob;
-        } else {
-          try {
-            file = await getVideoFileFromHandle(videoItem.path);
-          } catch (err) {
-            console.warn("[UI] No se pudo obtener el video:", err);
-            showReconnectBanner();
-            return;
-          }
-        }
-
-        if (!file) {
-          showReconnectBanner();
-          return;
-        }
-
-        try {
-          window.currentVideoUrl = URL.createObjectURL(file);
-          videoPlayer.src = window.currentVideoUrl;
-          videoPlayer.play();
-        } catch (err) {
-          console.error("[UI] Error al reproducir video:", err);
-        }
-
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      card.addEventListener("click", () => {
+        playVideoItem(videoItem);
       });
 
       container.appendChild(card);
@@ -240,6 +197,225 @@ window.renderVideoList = function (path = "") {
   }
 };
 
+// ============================================================
+// REPRODUCTOR DE VIDEO
+// ============================================================
+
+// Referencias a los elementos del reproductor
+function getVideoElements() {
+  return {
+    wrapper: document.getElementById("videoPlayerWrapper"),
+    player: document.getElementById("mainVideoPlayer"),
+    title: document.getElementById("videoTitleDisplay"),
+    meta: document.getElementById("videoMetaDisplay"),
+    breadcrumb: document.getElementById("videoPlayerBreadcrumb"),
+    btnPrev: document.getElementById("btnVideoPrev"),
+    btnNext: document.getElementById("btnVideoNext"),
+    btnClose: document.getElementById("btnVideoClose"),
+    btnBack: document.getElementById("btnVideoBack"),
+    btnFullscreen: document.getElementById("btnVideoFullscreen"),
+    btnPip: document.getElementById("btnVideoPip"),
+  };
+}
+
+// Reproduce un video desde el item
+async function playVideoItem(videoItem) {
+  if (window.pauseAudioPlayer) window.pauseAudioPlayer();
+
+  const els = getVideoElements();
+  if (!els.wrapper || !els.player) return;
+
+  // Limpiar video anterior
+  els.player.pause();
+  els.player.removeAttribute("src");
+  els.player.load();
+  if (window.currentVideoUrl) {
+    try { URL.revokeObjectURL(window.currentVideoUrl); } catch (e) {}
+    window.currentVideoUrl = null;
+  }
+
+  // Mostrar wrapper
+  els.wrapper.style.display = "block";
+
+  // Actualizar título y meta
+  if (els.title) els.title.textContent = videoItem.name;
+  if (els.meta) {
+    const parts = videoItem.path.split("/");
+    const folder = parts.length > 1 ? parts.slice(0, -1).join(" / ") : "Inicio";
+    els.meta.textContent = folder;
+  }
+
+  // Actualizar breadcrumb superior
+  if (els.breadcrumb) {
+    const parts = videoItem.path.split("/");
+    let bcHTML = "";
+    let buildPath = "";
+    parts.forEach((part, i) => {
+      if (i === parts.length - 1) {
+        // Último elemento (el archivo)
+        bcHTML += ` <span class="current">${escapeHtml(part)}</span>`;
+      } else {
+        buildPath += part + "/";
+        bcHTML += ` <span style="cursor:pointer;" onclick="window.hideVideoAndNavigate('${buildPath.replace(/'/g, "\\'")}')">${escapeHtml(part)}</span> /`;
+      }
+    });
+    els.breadcrumb.innerHTML = bcHTML;
+  }
+
+  // Guardar referencia del video actual para "siguiente/anterior"
+  window.currentVideoItem = videoItem;
+  updateVideoNavigationButtons(videoItem);
+
+  // Obtener archivo
+  let file = null;
+  if (videoItem.fileBlob instanceof Blob) {
+    file = videoItem.fileBlob;
+  } else {
+    try {
+      file = await getVideoFileFromHandle(videoItem.path);
+    } catch (err) {
+      console.warn("[UI] No se pudo obtener el video:", err);
+      showReconnectBanner();
+      return;
+    }
+  }
+
+  if (!file) {
+    showReconnectBanner();
+    return;
+  }
+
+  // Reproducir
+  try {
+    window.currentVideoUrl = URL.createObjectURL(file);
+    els.player.src = window.currentVideoUrl;
+    els.player.play().catch((err) => console.warn("[UI] play() video falló:", err));
+  } catch (err) {
+    console.error("[UI] Error al reproducir video:", err);
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// Habilitar/deshabilitar botones anterior/siguiente
+function updateVideoNavigationButtons(videoItem) {
+  const els = getVideoElements();
+  if (!els.btnPrev || !els.btnNext) return;
+
+  // Buscar hermanos: mismo prefijo de carpeta
+  const folderPath = videoItem.path.split("/").slice(0, -1).join("/");
+  const siblings = window.App.videoList
+    .filter((v) => v.path.split("/").slice(0, -1).join("/") === folderPath)
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+  const idx = siblings.findIndex((v) => v.path === videoItem.path);
+  window.currentVideoSiblings = siblings;
+  window.currentVideoIndex = idx;
+
+  els.btnPrev.disabled = idx <= 0;
+  els.btnNext.disabled = idx < 0 || idx >= siblings.length - 1;
+}
+
+// Reproducir anterior/siguiente
+function playPrevVideo() {
+  if (!window.currentVideoSiblings) return;
+  const idx = window.currentVideoIndex - 1;
+  if (idx >= 0 && window.currentVideoSiblings[idx]) {
+    playVideoItem(window.currentVideoSiblings[idx]);
+  }
+}
+
+function playNextVideo() {
+  if (!window.currentVideoSiblings) return;
+  const idx = window.currentVideoIndex + 1;
+  if (idx < window.currentVideoSiblings.length && window.currentVideoSiblings[idx]) {
+    playVideoItem(window.currentVideoSiblings[idx]);
+  }
+}
+
+// Cerrar el reproductor
+function closeVideoPlayer() {
+  const els = getVideoElements();
+  if (!els.wrapper || !els.player) return;
+
+  els.player.pause();
+  els.player.removeAttribute("src");
+  els.player.load();
+  if (window.currentVideoUrl) {
+    try { URL.revokeObjectURL(window.currentVideoUrl); } catch (e) {}
+    window.currentVideoUrl = null;
+  }
+
+  els.wrapper.style.display = "none";
+  window.currentVideoItem = null;
+  window.currentVideoSiblings = null;
+  window.currentVideoIndex = -1;
+}
+
+// Navegar desde el breadcrumb del reproductor (cierra y va a la carpeta)
+window.hideVideoAndNavigate = function (path) {
+  closeVideoPlayer();
+  window.renderVideoList(path);
+};
+
+// Toggle fullscreen
+function toggleVideoFullscreen() {
+  const els = getVideoElements();
+  if (!els.player) return;
+
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    if (els.player.requestFullscreen) {
+      els.player.requestFullscreen().catch((err) => console.warn(err));
+    } else if (els.player.webkitRequestFullscreen) {
+      els.player.webkitRequestFullscreen();
+    }
+  }
+}
+
+// Toggle Picture-in-Picture
+async function toggleVideoPip() {
+  const els = getVideoElements();
+  if (!els.player) return;
+
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+    } else {
+      await els.player.requestPictureInPicture();
+    }
+  } catch (err) {
+    console.warn("[UI] PiP no disponible:", err);
+    alert("Picture-in-Picture no está disponible en este dispositivo.");
+  }
+}
+
+// Registrar listeners de los botones del reproductor
+function setupVideoPlayerControls() {
+  const els = getVideoElements();
+
+  if (els.btnClose) els.btnClose.addEventListener("click", closeVideoPlayer);
+  if (els.btnBack) els.btnBack.addEventListener("click", closeVideoPlayer);
+  if (els.btnPrev) els.btnPrev.addEventListener("click", playPrevVideo);
+  if (els.btnNext) els.btnNext.addEventListener("click", playNextVideo);
+  if (els.btnFullscreen) els.btnFullscreen.addEventListener("click", toggleVideoFullscreen);
+  if (els.btnPip) {
+    // Ocultar PiP si el navegador no lo soporta
+    if (!document.pictureInPictureEnabled) {
+      els.btnPip.style.display = "none";
+    } else {
+      els.btnPip.addEventListener("click", toggleVideoPip);
+    }
+  }
+}
+
+// Ejecutar al cargar el DOM
+document.addEventListener("DOMContentLoaded", setupVideoPlayerControls);
+
+// ============================================================
+// Obtener archivo de video desde el handle
+// ============================================================
 async function getVideoFileFromHandle(relativePath) {
   const rootHandle = await window.loadHandleFromDB("video");
   if (!rootHandle) return null;
@@ -361,7 +537,7 @@ window.syncLyrics = function (currentTime) {
 };
 
 // ============================================================
-// PLAYER UI
+// PLAYER UI (audio)
 // ============================================================
 window.updatePlayerUI = function (track) {
   const pTitle = document.getElementById("playerTitle");
