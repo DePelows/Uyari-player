@@ -18,10 +18,19 @@
     <!-- Barra de navegación principal -->
     <aside class="sidebar">
       <div class="brand">
-        <svg class="brand-icon" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" style="background-color: #000000; border-radius: 8px; padding: 4px;">
-          <path d="M12 3a9 9 0 1 0 9 9" />
-          <path d="M12 7a5 5 0 1 0 5 5" />
-          <circle cx="12" cy="12" r="1.5" fill="#FFFFFF" stroke="none" />
+        <svg class="brand-icon" viewBox="0 0 512 512" width="34" height="34">
+          <defs>
+            <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#8b5cf6"/>
+              <stop offset="100%" stop-color="#6d28d9"/>
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="112" ry="112" fill="#000000"/>
+          <circle cx="256" cy="256" r="180" fill="none" stroke="#8b5cf6" stroke-width="14" opacity="0.15"/>
+          <circle cx="256" cy="256" r="140" fill="none" stroke="#8b5cf6" stroke-width="14" opacity="0.3"/>
+          <circle cx="256" cy="256" r="100" fill="none" stroke="#8b5cf6" stroke-width="14" opacity="0.55"/>
+          <circle cx="256" cy="256" r="72" fill="url(#brandGrad)"/>
+          <path d="M 228 220 L 228 292 C 228 298 235 302 240 299 L 296 265 C 301 262 301 250 296 247 L 240 213 C 235 210 228 214 228 220 Z" fill="#000000"/>
         </svg>
         <span class="brand-text">Uyari</span>
       </div>
