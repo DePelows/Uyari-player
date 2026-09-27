@@ -231,10 +231,8 @@ async function playVideoItem(videoItem) {
 
   const sameVideo = window.currentVideoPath === videoItem.path && window.currentVideoUrl;
 
-  // Mostrar wrapper
   els.wrapper.style.display = "block";
 
-  // Actualizar título y meta
   if (els.title) els.title.textContent = videoItem.name;
   if (els.meta) {
     const parts = videoItem.path.split("/");
@@ -242,7 +240,6 @@ async function playVideoItem(videoItem) {
     els.meta.textContent = folder;
   }
 
-  // Breadcrumb superior
   if (els.breadcrumb) {
     const parts = videoItem.path.split("/");
     let bcHTML = "";
@@ -261,9 +258,7 @@ async function playVideoItem(videoItem) {
   window.currentVideoItem = videoItem;
   updateVideoNavigationButtons(videoItem);
 
-  // ============================================
   // MISMO VIDEO: reusar
-  // ============================================
   if (sameVideo) {
     console.log("[UI] Mismo video, reusando URL");
     if (els.player.src !== window.currentVideoUrl) {
@@ -274,9 +269,7 @@ async function playVideoItem(videoItem) {
     return;
   }
 
-  // ============================================
   // VIDEO DIFERENTE: limpiar
-  // ============================================
   els.player.pause();
   els.player.removeAttribute("src");
   els.player.load();
@@ -403,6 +396,11 @@ async function toggleVideoPip() {
     if (document.pictureInPictureElement) {
       await document.exitPictureInPicture();
     } else {
+      // Antes de entrar en PiP, pausamos la música para evitar conflictos
+      if (window.pauseAudioPlayer) {
+        window.pauseAudioPlayer();
+        console.log("[UI] Música pausada antes de entrar en PiP");
+      }
       await els.player.requestPictureInPicture();
     }
   } catch (err) {
@@ -426,6 +424,19 @@ function setupVideoPlayerControls() {
     } else {
       els.btnPip.addEventListener("click", toggleVideoPip);
     }
+  }
+
+  // Cuando un video entra o sale de PiP, actualizamos el bloqueo
+  if (els.player) {
+    els.player.addEventListener("enterpictureinpicture", () => {
+      console.log("[UI] Video entró en PiP");
+      // Pausar música explícitamente
+      if (window.pauseAudioPlayer) window.pauseAudioPlayer();
+    });
+
+    els.player.addEventListener("leavepictureinpicture", () => {
+      console.log("[UI] Video salió de PiP");
+    });
   }
 }
 
