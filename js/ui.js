@@ -5,6 +5,12 @@
 window.currentLyricIndex = -1;
 window.currentVideoPath = "";
 window.currentVideoUrl = null;
+window.currentVideoItem = null;
+window.currentVideoSiblings = null;
+window.currentVideoIndex = -1;
+
+// Caché global de videos en memoria (evita pedir permiso varias veces)
+window.__videoCache = new Map();
 
 // ============================================================
 // LISTA DE CANCIONES
@@ -201,7 +207,6 @@ window.renderVideoList = function (path = "") {
 // REPRODUCTOR DE VIDEO
 // ============================================================
 
-// Referencias a los elementos del reproductor
 function getVideoElements() {
   return {
     wrapper: document.getElementById("videoPlayerWrapper"),
@@ -218,21 +223,13 @@ function getVideoElements() {
   };
 }
 
-// Reproduce un video desde el item
 async function playVideoItem(videoItem) {
   if (window.pauseAudioPlayer) window.pauseAudioPlayer();
 
   const els = getVideoElements();
   if (!els.wrapper || !els.player) return;
 
-  // Limpiar video anterior
-  els.player.pause();
-  els.player.removeAttribute("src");
-  els.player.load();
-  if (window.currentVideoUrl) {
-    try { URL.revokeObjectURL(window.currentVideoUrl); } catch (e) {}
-    window.currentVideoUrl = null;
-  }
+  const sameVideo = window.currentVideoPath === videoItem.path && window.currentVideoUrl;
 
   // Mostrar wrapper
   els.wrapper.style.display = "block";
@@ -245,14 +242,13 @@ async function playVideoItem(videoItem) {
     els.meta.textContent = folder;
   }
 
-  // Actualizar breadcrumb superior
+  // Breadcrumb superior
   if (els.breadcrumb) {
     const parts = videoItem.path.split("/");
     let bcHTML = "";
     let buildPath = "";
     parts.forEach((part, i) => {
       if (i === parts.length - 1) {
-        // Último elemento (el archivo)
         bcHTML += ` <span class="current">${escapeHtml(part)}</span>`;
       } else {
         buildPath += part + "/";
@@ -262,21 +258,62 @@ async function playVideoItem(videoItem) {
     els.breadcrumb.innerHTML = bcHTML;
   }
 
-  // Guardar referencia del video actual para "siguiente/anterior"
   window.currentVideoItem = videoItem;
   updateVideoNavigationButtons(videoItem);
 
-  // Obtener archivo
+  // ============================================
+  // MISMO VIDEO: reusar
+  // ============================================
+  if (sameVideo) {
+    console.log("[UI] Mismo video, reusando URL");
+    if (els.player.src !== window.currentVideoUrl) {
+      els.player.src = window.currentVideoUrl;
+    }
+    els.player.play().catch((err) => console.warn("[UI] play() falló:", err));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  // ============================================
+  // VIDEO DIFERENTE: limpiar
+  // ============================================
+  els.player.pause();
+  els.player.removeAttribute("src");
+  els.player.load();
+
+  if (window.currentVideoUrl) {
+    try { URL.revokeObjectURL(window.currentVideoUrl); } catch (e) {}
+    window.currentVideoUrl = null;
+  }
+
+  window.currentVideoPath = videoItem.path;
+
+  // Obtener archivo con caché
   let file = null;
+
   if (videoItem.fileBlob instanceof Blob) {
     file = videoItem.fileBlob;
+    console.log("[UI] Video desde item.fileBlob (caché)");
   } else {
-    try {
-      file = await getVideoFileFromHandle(videoItem.path);
-    } catch (err) {
-      console.warn("[UI] No se pudo obtener el video:", err);
-      showReconnectBanner();
-      return;
+    if (!window.__videoCache) window.__videoCache = new Map();
+
+    if (window.__videoCache.has(videoItem.path)) {
+      file = window.__videoCache.get(videoItem.path);
+      videoItem.fileBlob = file;
+      console.log("[UI] Video desde caché global");
+    } else {
+      try {
+        console.log("[UI] Pidiendo archivo al handle:", videoItem.path);
+        file = await getVideoFileFromHandle(videoItem.path);
+        if (file) {
+          window.__videoCache.set(videoItem.path, file);
+          videoItem.fileBlob = file;
+        }
+      } catch (err) {
+        console.warn("[UI] No se pudo obtener el video:", err);
+        showReconnectBanner();
+        return;
+      }
     }
   }
 
@@ -285,7 +322,6 @@ async function playVideoItem(videoItem) {
     return;
   }
 
-  // Reproducir
   try {
     window.currentVideoUrl = URL.createObjectURL(file);
     els.player.src = window.currentVideoUrl;
@@ -297,12 +333,10 @@ async function playVideoItem(videoItem) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-// Habilitar/deshabilitar botones anterior/siguiente
 function updateVideoNavigationButtons(videoItem) {
   const els = getVideoElements();
   if (!els.btnPrev || !els.btnNext) return;
 
-  // Buscar hermanos: mismo prefijo de carpeta
   const folderPath = videoItem.path.split("/").slice(0, -1).join("/");
   const siblings = window.App.videoList
     .filter((v) => v.path.split("/").slice(0, -1).join("/") === folderPath)
@@ -316,7 +350,6 @@ function updateVideoNavigationButtons(videoItem) {
   els.btnNext.disabled = idx < 0 || idx >= siblings.length - 1;
 }
 
-// Reproducir anterior/siguiente
 function playPrevVideo() {
   if (!window.currentVideoSiblings) return;
   const idx = window.currentVideoIndex - 1;
@@ -333,32 +366,20 @@ function playNextVideo() {
   }
 }
 
-// Cerrar el reproductor
 function closeVideoPlayer() {
   const els = getVideoElements();
   if (!els.wrapper || !els.player) return;
 
+  // Solo pausar. NO revocar URL para poder reabrir el mismo video sin pedir permiso.
   els.player.pause();
-  els.player.removeAttribute("src");
-  els.player.load();
-  if (window.currentVideoUrl) {
-    try { URL.revokeObjectURL(window.currentVideoUrl); } catch (e) {}
-    window.currentVideoUrl = null;
-  }
-
   els.wrapper.style.display = "none";
-  window.currentVideoItem = null;
-  window.currentVideoSiblings = null;
-  window.currentVideoIndex = -1;
 }
 
-// Navegar desde el breadcrumb del reproductor (cierra y va a la carpeta)
 window.hideVideoAndNavigate = function (path) {
   closeVideoPlayer();
   window.renderVideoList(path);
 };
 
-// Toggle fullscreen
 function toggleVideoFullscreen() {
   const els = getVideoElements();
   if (!els.player) return;
@@ -374,7 +395,6 @@ function toggleVideoFullscreen() {
   }
 }
 
-// Toggle Picture-in-Picture
 async function toggleVideoPip() {
   const els = getVideoElements();
   if (!els.player) return;
@@ -391,7 +411,6 @@ async function toggleVideoPip() {
   }
 }
 
-// Registrar listeners de los botones del reproductor
 function setupVideoPlayerControls() {
   const els = getVideoElements();
 
@@ -400,8 +419,8 @@ function setupVideoPlayerControls() {
   if (els.btnPrev) els.btnPrev.addEventListener("click", playPrevVideo);
   if (els.btnNext) els.btnNext.addEventListener("click", playNextVideo);
   if (els.btnFullscreen) els.btnFullscreen.addEventListener("click", toggleVideoFullscreen);
+
   if (els.btnPip) {
-    // Ocultar PiP si el navegador no lo soporta
     if (!document.pictureInPictureEnabled) {
       els.btnPip.style.display = "none";
     } else {
@@ -410,7 +429,6 @@ function setupVideoPlayerControls() {
   }
 }
 
-// Ejecutar al cargar el DOM
 document.addEventListener("DOMContentLoaded", setupVideoPlayerControls);
 
 // ============================================================
